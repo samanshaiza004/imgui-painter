@@ -1,15 +1,14 @@
-# Architecture: core and adapter
+# Architecture: core and bindings
 
 ```
-imgui-painter core     (C++, compiled via cc; ZERO Dear ImGui / cimgui
-                        dependency — pure math in, a generic vertex/index
-                        mesh out)
-        ↑ C API (capi/imgui_painter_c.h)
-imgui-painter Rust adapter  (bindings/rust — copies the core's mesh into a
-                        real ImDrawList through imgui-sys's own public
-                        PrimReserve/PrimWriteVtx/PrimWriteIdx calls)
-        ↑
-host app (via imgui-rs/imgui-sys)
+imgui-painter core  (C++; ZERO Dear ImGui / cimgui dependency — pure math in,
+                     a generic vertex/index mesh out)
+        │
+        └── C ABI (capi/imgui_painter_c.h)
+              ├── C++ fluent header (include/imgui_painter.h)
+              │     └── host app (Dear ImGui C++ API)
+              └── Rust binding (bindings/rust)
+                    └── host app (imgui-rs/imgui-sys)
 ```
 
 ## The core knows nothing about ImGui
@@ -26,11 +25,11 @@ Two things follow from that:
    same C ABI can serve future C, Zig, C#, and Python bindings — see
    [The C ABI](../c-abi.md).
 
-## The adapter writes only through public prim APIs
+## Bindings write only through public prim APIs
 
-The adapter copies the core's mesh into a real `ImDrawList` using
-`PrimReserve`, `PrimWriteVtx`, and `PrimWriteIdx`. It never writes into
-`ImDrawList`'s internal buffers.
+The C++ fluent header and the Rust adapter both copy the core's mesh into a real
+`ImDrawList` using `PrimReserve`, `PrimWriteVtx`, and `PrimWriteIdx`. Neither
+writes into `ImDrawList`'s internal buffers.
 
 This was a deliberate correction, not the original design. An earlier plan had
 the core write straight into `ImDrawList`'s vertex and index buffers, so that
@@ -47,12 +46,13 @@ Those are maintained by methods like `PrimReserve`, are not covered by any ABI
 guarantee, and **have changed across Dear ImGui versions**. Reimplementing them
 would mean silently re-breaking on every upstream release.
 
-The core/adapter split gets the same "core has zero ImGui dependency" property
+The core/binding split gets the same "core has zero ImGui dependency" property
 without taking responsibility for invariants only Dear ImGui itself should own.
 
-## One imgui-sys build
+## One imgui-sys build in the Rust binding
 
-Cargo must resolve the adapter and the host's imgui-rs to a **single**
+This constraint belongs specifically to `bindings/rust`. Cargo must resolve the
+Rust adapter and the host's imgui-rs to a **single**
 `imgui-sys`. If it resolves two, you get two Dear ImGui instances with separate
 contexts, separate font atlases, and separate draw data — which renders garbage
 or crashes.
@@ -72,11 +72,13 @@ library is pinned to one ImGui release.
 | Layer | Depends on ImGui version? |
 |---|---|
 | C++ core (`src/painter.cpp`) | No — no ImGui dependency at all |
-| Adapter (`adapter.rs`) | No — `PrimReserve`/`PrimWrite*` are stable |
-| Style data types (`Material`, `StateColors`, …) | No — plain data |
-| Recipe builders (`raised_button`, `panel`, …) | No |
-| `decorate_*` | **Yes** — reconstructs widget chrome geometry |
-| `recipes::apply_imgui_colors` | **Yes** — names newer color roles |
+| C++ fluent header (`include/imgui_painter.h`) | No — uses public `PrimReserve`/`PrimWrite*` methods |
+| Rust adapter (`adapter.rs`) | No — `PrimReserve`/`PrimWrite*` are stable |
+| Rust style data types (`Material`, `StateColors`, …) | No — plain data |
+| Rust recipe builders (`raised_button`, `panel`, …) | No |
+| Rust `decorate_*` | **Yes** — reconstructs widget chrome geometry |
+| Rust `recipes::apply_imgui_colors` | **Yes** — names newer color roles |
 
-Only the last two rows are pinned. Everything else works against any reasonable
-Dear ImGui. See [The compatibility contract](../decorators/contract.md).
+Only the last two rows are pinned, and both are Rust-only today. The core and
+C++ fluent header have no Dear ImGui version coupling. See
+[The compatibility contract](../decorators/contract.md).

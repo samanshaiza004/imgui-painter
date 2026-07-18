@@ -1,5 +1,11 @@
 # Widget notes
 
+> This layer currently exists only in the Rust binding. Everything needed to
+> build it in C++ is public Dear ImGui API: `ImDrawList::ChannelsSplit`,
+> `PushStyleColor`, `IsItemHovered`/`IsItemActive`, and
+> `GetItemRectMin`/`GetItemRectMax`. See the
+> [C++ parity plan](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md).
+
 Per-widget behavior, ownership boundaries, and the gotchas worth knowing before
 you reach them.
 

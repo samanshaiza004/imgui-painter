@@ -1,5 +1,9 @@
 # Recipes and palettes
 
+> Recipes and `Palette` currently exist only in the Rust binding. A C++ version
+> is a mechanical port: this layer is pure data and color arithmetic. See the
+> [C++ parity plan](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md).
+
 `recipes` is an optional convenience layer. It turns a small set of palette
 tokens into `Material`s and painted surfaces, so a host does not hand-author
 every gradient and border.
