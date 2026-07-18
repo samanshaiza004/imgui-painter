@@ -52,6 +52,8 @@ void fluent_header_mock_entry_point() {
         .band(0.0f, 1.0f, ip_color(0xFFFFFFFFu))
         .border(ip_border{1.0f, ip_color(0xFF000000u)})
         .border(1.0f, ip_border{1.0f, ip_color(0x40FFFFFFu)})
+        .line(ip_vec2{0.0f, 0.0f}, ip_vec2{40.0f, 40.0f}, 1.0f,
+              ip_color(0xFFFFFFFFu))
         .draw(dl);
 
     // Shadow + gradient fill, the ip_gradient overload of fill() -- proves
@@ -68,4 +70,37 @@ void fluent_header_mock_entry_point() {
         .fill(gradient)
         .band(20.0f, 40.0f, gradient)
         .draw(dl);
+}
+
+void reusable_fluent_header_mock_entry_point() {
+    MockDrawList dl;
+    ip::Context context;
+    ip::Frame frame = context.begin_frame(ip_vec2{0.5f, 0.5f}, 2.0f);
+    const ip_rect rect{{0.0f, 0.0f}, {40.0f, 40.0f}};
+    const ip_color_stop stops[2] = {
+        {0.0f, ip_color(0xFFFFFFFFu)},
+        {1.0f, ip_color(0xFF000000u)},
+    };
+    const ip_gradient gradient{
+        IP_GRADIENT_LINEAR, {0.0f, 0.0f}, {0.0f, 40.0f}, stops, 2,
+    };
+
+    {
+        auto canvas = frame.canvas(dl);
+        canvas.rounded_rect(rect, 4.0f)
+            .shadow(ip_shadow{{0.0f, 2.0f}, 8.0f, 0.0f, ip_color(0x3C000000u), false})
+            .fill(ip_color(0xFFAABBCCu))
+            .band(0.0f, canvas.device_pixel(), ip_color(0xFFFFFFFFu))
+            .border(ip_border{1.0f, ip_color(0xFF000000u)});
+    }
+
+    {
+        auto canvas = frame.canvas(dl);
+        canvas.rounded_rect(rect, 4.0f)
+            .fill(gradient)
+            .band(20.0f, 40.0f, gradient)
+            .border(1.0f, ip_border{1.0f, ip_color(0x40FFFFFFu)})
+            .line(ip_vec2{0.0f, 20.0f}, ip_vec2{40.0f, 20.0f}, 1.0f,
+                  ip_color(0xFFFFFFFFu));
+    }
 }
