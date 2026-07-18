@@ -1,6 +1,9 @@
 # Rust build artifacts
 /target
 **/target
+# Library crate: consumers resolve their own versions. The compat-gate CI
+# job also depends on a fresh cargo generate-lockfile each run.
+Cargo.lock
 
 # mdBook output
 book/book/

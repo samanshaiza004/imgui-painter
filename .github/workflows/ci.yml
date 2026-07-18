@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: fmt
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: test
+        run: cargo test --workspace
+
+      - name: build examples
+        run: cargo build --workspace --examples
+
+  # Reconstructed widget-chrome geometry (Checkbox box, InputText frame) is
+  # not a stable Dear ImGui contract, so a fork revision change can compile
+  # cleanly while silently moving the stock widget away from the painted
+  # rectangle. This gate makes that fact impossible to ignore: it resolves
+  # imgui-sys fresh (no lockfile) and fails whenever the resolved revision
+  # differs from VERIFIED_IMGUI_SYS, the revision a human last ran the full
+  # visual gate against. See CONTRIBUTING.md's dependency-bump checklist for
+  # how to acknowledge a legitimate bump.
+  compat-gate:
+    name: VERIFIED_IMGUI_SYS gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check resolved imgui-sys revision against VERIFIED_IMGUI_SYS
+        shell: bash
+        run: |
+          cargo generate-lockfile
+          verified="$(tr -d '[:space:]' < VERIFIED_IMGUI_SYS)"
+          resolved="$(cargo pkgid imgui-sys | grep -oE '[0-9a-f]{40}' | head -n 1)"
+          if [ "$resolved" != "$verified" ]; then
+            echo "The imgui-rs fork resolved to revision $resolved but the"
+            echo "painter_demo visual gate was last verified against $verified."
+            echo "Run the Dependency bump checklist in CONTRIBUTING.md,"
+            echo "then update VERIFIED_IMGUI_SYS to $resolved."
+            exit 1
+          fi
+          echo "imgui-rs fork revision $resolved matches the visually verified revision."
