@@ -3,7 +3,7 @@
 // header comment. Pure math in, a generic (ip_vertex, uint16_t index) mesh
 // out.
 
-#include "../capi/imgui_painter_c.h"
+#include "imgui_painter_c.h"
 
 #include <algorithm>
 #include <cmath>

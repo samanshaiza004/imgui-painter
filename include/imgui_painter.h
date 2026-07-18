@@ -21,7 +21,7 @@
 #ifndef IMGUI_PAINTER_H
 #define IMGUI_PAINTER_H
 
-#include "../capi/imgui_painter_c.h"
+#include "imgui_painter_c.h"
 
 #include <cstdint>
 
