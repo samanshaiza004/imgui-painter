@@ -48,7 +48,7 @@ jobs:
           mkdir -p site
           cp -r book/book/. site/
           mkdir -p site/api
-          cp -r target/doc/. site/api/
+          cp -r bindings/rust/target/doc/. site/api/
 
       - uses: actions/upload-pages-artifact@v3
         with:
