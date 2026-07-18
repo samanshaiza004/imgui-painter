@@ -9,6 +9,10 @@ Cargo.lock
 # mdBook output
 book/book/
 
+# Dear ImGui runtime settings cache, written to cwd by any local run of an
+# ImGui-context test/example/tool.
+/imgui.ini
+
 # Editor / OS cruft
 .DS_Store
 *.swp
