@@ -1,0 +1,65 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install mdBook
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook
+
+      - name: Build the book
+        run: mdbook build book
+
+      # Built with the workspace's own [patch.crates-io] (the pinned imgui-rs
+      # fork), so the decorator docs reflect the actual supported Dear ImGui
+      # version. docs.rs cannot do this today — it builds against stock
+      # imgui-sys, which is not the version this crate's decorators target.
+      - name: Build API docs
+        working-directory: bindings/rust
+        run: cargo doc --no-deps --all-features
+
+      - name: Assemble site
+        run: |
+          mkdir -p site
+          cp -r book/book/. site/
+          mkdir -p site/api
+          cp -r target/doc/. site/api/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
