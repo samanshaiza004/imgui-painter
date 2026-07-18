@@ -40,15 +40,25 @@ jobs:
       # version. docs.rs cannot do this today — it builds against stock
       # imgui-sys, which is not the version this crate's decorators target.
       - name: Build API docs
-        working-directory: bindings/rust
-        run: cargo doc --no-deps --all-features
+        run: cargo doc --no-deps --all-features -p imgui-painter
 
+      # Ask cargo where the target directory actually is rather than assuming.
+      # Hardcoding it broke once already: adding the workspace root moved the
+      # target dir from bindings/rust/target to the root, and this step kept
+      # copying from the old path.
       - name: Assemble site
         run: |
-          mkdir -p site
-          cp -r book/book/. site/
+          set -euo pipefail
+          doc_dir="$(cargo metadata --format-version 1 --no-deps | \
+            python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')/doc"
+          test -d "$doc_dir" || { echo "::error::rustdoc output not found at $doc_dir"; exit 1; }
+          test -f "$doc_dir/imgui_painter/index.html" || {
+            echo "::error::rustdoc output at $doc_dir has no imgui_painter crate docs"; exit 1; }
           mkdir -p site/api
-          cp -r bindings/rust/target/doc/. site/api/
+          cp -r book/book/. site/
+          cp -r "$doc_dir"/. site/api/
+          test -f site/index.html && test -f site/api/imgui_painter/index.html
+          echo "Assembled: book at /, rustdoc at /api/"
 
       - uses: actions/upload-pages-artifact@v3
         with:
