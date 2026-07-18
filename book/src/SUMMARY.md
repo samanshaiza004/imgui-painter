@@ -5,23 +5,18 @@
 
 # Concepts
 
-- [Architecture: core and adapter](concepts/architecture.md)
-- [Painter, Frame, Canvas](concepts/lifecycle.md)
+- [Architecture: core and bindings](concepts/architecture.md)
+- [Painting sessions](concepts/lifecycle.md)
 - [Geometry and composition](concepts/geometry.md)
+- [The C ABI](c-abi.md)
 
-# Decorating stock widgets
+# The Rust binding
 
+- [Overview](rust/index.md)
 - [How decoration works](decorators/index.md)
 - [The compatibility contract](decorators/contract.md)
 - [Widget notes](decorators/widgets.md)
-
-# Styling
-
 - [Recipes and palettes](recipes.md)
-
-# Other languages
-
-- [The C ABI](c-abi.md)
 
 # Appendices
 

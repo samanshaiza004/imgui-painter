@@ -1,129 +1,128 @@
 # Getting started
 
+This page covers C++. For the Rust binding — which is where widget decoration currently
+lives — see [the Rust overview](rust/index.md).
+
 ## Requirements
 
-- A **C++17 compiler**. The core is C++ compiled by [`cc`](https://docs.rs/cc) at
-  build time — the same mechanism `imgui-sys` uses for cimgui.
-  - macOS: Xcode Command Line Tools (`xcode-select --install`)
-  - Linux: GCC or Clang, plus `libgtk-3-dev` if you want to build the examples
-  - Windows: Visual Studio Build Tools
-- A host already using `imgui-rs` / `imgui-sys` 0.12.
+- A **C++17** compiler.
+- Dear ImGui already integrated into your application.
 
-## Adding the dependency
+## Adding it to your build
 
-The crate is not on crates.io yet, so depend on it by git:
+There is no build system in the repo yet (it's the first item on the
+[parity plan](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md)),
+so add the two core sources to your own build:
 
-```toml
-[dependencies]
-imgui-painter = { git = "https://github.com/samanshaiza004/imgui-painter", rev = "..." }
+```
+capi/imgui_painter_c.cpp
+src/painter.cpp
 ```
 
-If you use the widget decorators, your workspace root must also pin the imgui-rs
-fork that provides the supported Dear ImGui version:
+with `capi/` and `include/` on your include path. Then:
 
-```toml
-[patch.crates-io]
-imgui = { git = "https://github.com/samanshaiza004/imgui-rs", rev = "7a89260c79ad1f9d4bfe81d6ca1b76ad38a6b3e3" }
-imgui-sys = { git = "https://github.com/samanshaiza004/imgui-rs", rev = "7a89260c79ad1f9d4bfe81d6ca1b76ad38a6b3e3" }
+```cpp
+#include "imgui_painter.h"
 ```
 
-This has to live in **your** workspace root. Cargo ignores `[patch]` sections
-declared by dependencies, so imgui-painter cannot apply it on your behalf. See
-[The compatibility contract](decorators/contract.md) for why the pin exists.
+The core compiles standalone — it includes no ImGui header — so it does not care which Dear
+ImGui version, backend, or build flags your application uses.
 
-After adding it, confirm you have exactly one ImGui:
+## Your first painted shape
 
-```sh
-cargo tree -d | grep imgui-sys
+```cpp
+ImDrawList* dl = ImGui::GetWindowDrawList();
+const ImVec2 uv = ImGui::GetFontTexUvWhitePixel();
+const ImVec2 p  = ImGui::GetCursorScreenPos();
+
+const ip_rect rect = {{p.x, p.y}, {p.x + 200.0f, p.y + 32.0f}};
+const ip_border border = {1.0f, IM_COL32(0, 0, 0, 90)};
+
+ip::Painter({uv.x, uv.y}, rect, 5.0f)
+    .pixel_scale(ImGui::GetIO().DisplayFramebufferScale.x)
+    .fill(IM_COL32(48, 52, 62, 255))
+    .border(border)
+    .draw(*dl);
+
+ImGui::Dummy({200.0f, 32.0f});   // reserve the layout space you painted into
 ```
 
-Two `imgui-sys` builds means two Dear ImGui instances, which produces garbage
-rendering or a crash. This is the single most important thing to verify when
-integrating.
+`ip_color` uses the same packing as `ImU32`, so `IM_COL32` values pass straight through.
 
-## Decorating your first widget
+### The two host values
 
-Create one long-lived `Painter` at startup, then per frame:
+Both must be supplied by you, and both fail *silently* if you get them wrong:
 
-```rust
-use imgui_painter::{decorate_button, rgba, Border, Material, StateColors};
+| Value | Source | Failure mode if wrong |
+|---|---|---|
+| `white_pixel_uv` | `ImGui::GetFontTexUvWhitePixel()` | Samples the wrong texel in your atlas — no error, just wrong output |
+| `pixel_scale` | `ImGui::GetIO().DisplayFramebufferScale.x` | Sub-pixel hairlines blur on HiDPI displays |
 
-let material = Material {
-    radius: 5.0,
-    fill: StateColors {
-        base: rgba(45, 108, 223, 255),
-        hover: rgba(62, 128, 240, 255),
-        active: rgba(35, 88, 190, 255),
-    },
-    border: Border {
-        thickness: 1.0,
-        color: rgba(255, 255, 255, 48),
-    },
-    shadow: None,
+Order matters: the `Painter` constructor calls `ip_begin`, which **resets the pixel scale to
+1.0**. So `.pixel_scale()` has to come after construction — which the chained form above
+naturally does.
+
+## Composing something richer
+
+The point of the library is that layers stack in call order:
+
+```cpp
+const float scale = ImGui::GetIO().DisplayFramebufferScale.x;
+const float hairline = 1.0f / scale;
+
+ip::Painter painter({uv.x, uv.y}, rect, 5.0f);
+painter.pixel_scale(scale)
+    .shadow(drop)                              // elevation, behind everything
+    .fill(surface)                             // multi-stop base gradient
+    .band(rect.min.y, gloss_end, gloss)        // translucent gloss over the top
+    .band(rect.min.y, rect.min.y + hairline,   // one-device-pixel bevel
+          IM_COL32(255, 255, 255, 40))
+    .shadow(inset)                             // recessed depth
+    .border(outer)
+    .border(hairline, inner);                  // a second, inset outline
+painter.draw(*dl);
+```
+
+Read that top to bottom and you have the paint order. There is no z-index, no stylesheet, and
+nothing implicit between two adjacent calls.
+
+## Gradients
+
+```cpp
+const ip_color_stop stops[] = {
+    {0.0f, IM_COL32(72, 78, 92, 255)},
+    {0.5f, IM_COL32(58, 63, 75, 255)},
+    {1.0f, IM_COL32(44, 48, 58, 255)},
 };
 
-let mut frame = painter.begin_frame();
-// SAFETY: this runs inside the current ImGui window and frame, and the
-// closure issues exactly one stock widget item.
-unsafe {
-    decorate_button(&mut frame, &material, || ui.button("Decorated Button"));
-}
-```
-
-`decorate_button` returns whatever the closure returns, so the usual `if
-ui.button(..)` control flow still works:
-
-```rust
-let clicked = unsafe {
-    decorate_button(&mut frame, &material, || ui.button("Save"))
+const ip_gradient surface = {
+    IP_GRADIENT_LINEAR,
+    {rect.min.x, rect.min.y},    // from
+    {rect.min.x, rect.max.y},    // to — a vertical axis
+    stops,
+    3,
 };
-if clicked {
-    save();
-}
 ```
 
-### Why `unsafe`
+Stop `t` values must ascend. Modes are `IP_GRADIENT_LINEAR`, `_RADIAL`, `_ANGULAR`, and
+`_DIAMOND`; for radial, `from` is the center and `to` sets the radius.
 
-The decorators call into `imgui-sys` and rely on being inside a live ImGui frame
-and window. The contract you are upholding is:
+## Decorating stock widgets
 
-1. There is a current ImGui frame and window.
-2. The closure submits **exactly one** stock widget item.
+Not available from C++ yet. The layer that restyles a live `ImGui::Button()` — suppressing its
+chrome, splitting the draw list, and painting behind it — currently exists only in the
+[Rust binding](rust/index.md).
 
-Breaking either is undefined behavior, which is why the call is `unsafe` rather
-than merely fallible.
+Everything needed to build it *is* public Dear ImGui C++ API (`ImDrawList::ChannelsSplit`,
+`PushStyleColor`, `IsItemHovered`/`IsItemActive`, `GetItemRectMin`/`Max`), so this is work not
+yet done rather than a technical obstacle. The plan is in
+[docs/cpp-parity.md](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md).
 
-## Painting directly
+In the meantime, painting panels, strips, wells, and backgrounds behind stock widgets works
+today — paint the surface first, then submit the widgets that sit on it.
 
-Not everything is a widget. For panels, strips, and backgrounds, get a `Canvas`
-and paint shapes yourself:
+## Performance note
 
-```rust
-let mut frame = painter.begin_frame();
-unsafe {
-    let draw_list = imgui::sys::igGetWindowDrawList();
-    let mut canvas = frame.canvas(draw_list);
-    canvas.rounded_rect(rect, 3.0);
-    canvas.fill_color(rgba(40, 44, 52, 255));
-    canvas.add_border(&Border { thickness: 1.0, color: rgba(0, 0, 0, 90) });
-}
-```
-
-Paint parent surfaces **before** submitting the child widgets that sit on them —
-draw order is submission order. See [Geometry and composition](concepts/geometry.md).
-
-## Running the demo
-
-The visual sandbox is the fastest way to see what the toolkit can do:
-
-```sh
-cargo run --example painter_demo
-```
-
-It renders hand-built looks, decorated stock widgets, a layered-chrome state row,
-a Slider/Combo/TreeNode gallery, and a recipe rack. It also accepts a demo-only
-logical UI scale, which is how compatibility screenshots are produced:
-
-```sh
-IMGUI_PAINTER_DEMO_UI_SCALE=1.5 cargo run --example painter_demo
-```
+`ip::Painter` creates and destroys one native context per instance, so a frame with many
+painted elements creates many. That is fine at panel-and-strip scale and wasteful per-row in a
+long list. A reusable per-frame context is the second item on the parity plan.
