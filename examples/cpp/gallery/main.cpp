@@ -163,6 +163,21 @@ void draw_widget_decorators(ip::Frame &frame) {
             "Type into the stock ImGui editor", input_buffer,
             sizeof(input_buffer));
     });
+
+    const ip::SliderStyle slider = ip::parameter_slider(palette);
+    static float gain = 0.62f;
+    ip::decorate_slider_f32(frame, slider, 0.0f, 1.0f, gain, [&](float &value) {
+        return ImGui::SliderFloat("Decorated gain", &value, 0.0f, 1.0f);
+    });
+
+    static float disabled_gain = 0.35f;
+    ImGui::BeginDisabled();
+    ip::decorate_slider_f32(
+        frame, slider, 0.0f, 1.0f, disabled_gain, [&](float &value) {
+            return ImGui::SliderFloat("Disabled decorated gain", &value, 0.0f,
+                                      1.0f);
+        });
+    ImGui::EndDisabled();
 }
 
 void draw_gallery(ip::Context &context, const demo::Backend &backend) {

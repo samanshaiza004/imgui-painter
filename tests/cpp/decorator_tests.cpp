@@ -51,11 +51,12 @@ void begin_fixed_window(const char *name) {
 
 bool same_vec(ImVec2 a, ImVec2 b) { return a.x == b.x && a.y == b.y; }
 
+template <std::size_t Count>
 void require_same_colors(ip::detail::Decorator decorator,
-                         const ImGuiCol (&expected)[3], const char *message) {
+                         const ImGuiCol (&expected)[Count], const char *message) {
     const ip::detail::SuppressedColors actual =
         ip::detail::suppressed_colors(decorator);
-    require(actual.count == 3, message);
+    require(actual.count == static_cast<int>(Count), message);
     for (int index = 0; index < actual.count; ++index) {
         require(actual.data[index] == expected[index], message);
     }
@@ -68,6 +69,9 @@ void decorators_suppress_expected_color_families() {
         ImGuiCol_Header, ImGuiCol_HeaderHovered, ImGuiCol_HeaderActive};
     constexpr ImGuiCol frame[] = {
         ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive};
+    constexpr ImGuiCol slider[] = {
+        ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive,
+        ImGuiCol_SliderGrab, ImGuiCol_SliderGrabActive};
 
     require_same_colors(ip::detail::Decorator::Button, button,
                         "Button suppression family is wrong");
@@ -77,6 +81,89 @@ void decorators_suppress_expected_color_families() {
                         "Checkbox suppression family is wrong");
     require_same_colors(ip::detail::Decorator::InputText, frame,
                         "InputText suppression family is wrong");
+    require_same_colors(ip::detail::Decorator::Slider, slider,
+                        "Slider suppression family is wrong");
+}
+
+bool same_rect(ip_rect a, ip_rect b) {
+    return a.min.x == b.min.x && a.min.y == b.min.y &&
+           a.max.x == b.max.x && a.max.y == b.max.y;
+}
+
+float center_x(ip_rect rect) { return (rect.min.x + rect.max.x) * 0.5f; }
+
+void slider_grab_padding_ignores_framebuffer_scale() {
+    const ip_rect frame{{0.0f, 0.0f}, {100.0f, 20.0f}};
+    const ip_rect at_one =
+        ip::detail::slider_anatomy(frame, 0.0f, 1.0f, 0.0f, 10.0f, 1.0f).grab;
+    const ip_rect at_one_and_half =
+        ip::detail::slider_anatomy(frame, 0.0f, 1.0f, 0.0f, 10.0f, 1.5f).grab;
+    const ip_rect at_two =
+        ip::detail::slider_anatomy(frame, 0.0f, 1.0f, 0.0f, 10.0f, 2.0f).grab;
+    require(same_rect(at_one, at_one_and_half),
+            "Slider grab changed at framebuffer scale 1.5");
+    require(same_rect(at_one, at_two),
+            "Slider grab changed at framebuffer scale 2.0");
+}
+
+void slider_track_minimum_uses_framebuffer_scale_only() {
+    const ip_rect frame{{0.0f, 0.0f}, {100.0f, 4.0f}};
+    const ip_rect at_one =
+        ip::detail::slider_anatomy(frame, 0.0f, 1.0f, 0.5f, 2.0f, 1.0f).track;
+    const ip_rect at_two =
+        ip::detail::slider_anatomy(frame, 0.0f, 1.0f, 0.5f, 2.0f, 2.0f).track;
+    require(ip::detail::rect_height(at_one) == 2.0f,
+            "Slider track minimum at scale 1.0 is not two pixels");
+    require(ip::detail::rect_height(at_two) == 1.0f,
+            "Slider track minimum at scale 2.0 is not one logical unit");
+}
+
+void slider_anatomy_scales_with_logical_style_metrics() {
+    const ip::detail::SliderAnatomy base = ip::detail::slider_anatomy(
+        {{0.0f, 0.0f}, {100.0f, 20.0f}}, 0.0f, 1.0f, 0.5f, 10.0f, 1.0f);
+    const ip::detail::SliderAnatomy scaled = ip::detail::slider_anatomy(
+        {{0.0f, 0.0f}, {200.0f, 40.0f}}, 0.0f, 1.0f, 0.5f, 20.0f, 1.0f);
+    require(ip::detail::rect_width(scaled.grab) ==
+                ip::detail::rect_width(base.grab) * 2.0f,
+            "Slider grab width did not scale with GrabMinSize");
+    require(center_x(scaled.grab) == 100.0f,
+            "Scaled Slider grab is not centered at x=100");
+}
+
+void slider_anatomy_maps_values_and_degenerate_ranges() {
+    const ip_rect frame{{0.0f, 0.0f}, {100.0f, 20.0f}};
+    const auto center = [frame](float min, float max, float value) {
+        return center_x(ip::detail::slider_anatomy(
+                            frame, min, max, value, 10.0f, 1.0f)
+                            .grab);
+    };
+    require(center(0.0f, 1.0f, 0.0f) < 10.0f,
+            "Slider minimum value did not map near the left edge");
+    require(center(0.0f, 1.0f, 0.5f) == 50.0f,
+            "Slider midpoint did not map to x=50");
+    require(center(0.0f, 1.0f, 1.0f) > 90.0f,
+            "Slider maximum value did not map near the right edge");
+    require(center(1.0f, 0.0f, 1.0f) < 10.0f,
+            "Reversed Slider range did not map its minimum position left");
+    require(std::isfinite(center(1.0f, 1.0f, 1.0f)),
+            "Degenerate Slider range produced a non-finite center");
+}
+
+void slider_visual_states_map_to_material_slots() {
+    using ip::detail::SliderVisualState;
+    using ip::detail::StateColorSlot;
+    require(ip::detail::slider_state_color_slot(SliderVisualState::Idle) ==
+                StateColorSlot::Base,
+            "Idle Slider state did not map to Base");
+    require(ip::detail::slider_state_color_slot(SliderVisualState::Hovered) ==
+                StateColorSlot::Hover,
+            "Hovered Slider state did not map to Hover");
+    require(ip::detail::slider_state_color_slot(SliderVisualState::Focused) ==
+                StateColorSlot::Hover,
+            "Focused Slider state did not map to Hover");
+    require(ip::detail::slider_state_color_slot(SliderVisualState::Adjusting) ==
+                StateColorSlot::Active,
+            "Adjusting Slider state did not map to Active");
 }
 
 void require_chrome_matches(const ip_rect &chrome, ImVec2 expected_min,
@@ -254,6 +341,16 @@ int main(int argc, char **argv) {
             decoration_preserves_last_item_queries();
         } else if (selector == "exception-safety") {
             exception_restores_style_colors_and_draw_channels();
+        } else if (selector == "slider-grab-padding") {
+            slider_grab_padding_ignores_framebuffer_scale();
+        } else if (selector == "slider-track-minimum") {
+            slider_track_minimum_uses_framebuffer_scale_only();
+        } else if (selector == "slider-logical-scale") {
+            slider_anatomy_scales_with_logical_style_metrics();
+        } else if (selector == "slider-value-mapping") {
+            slider_anatomy_maps_values_and_degenerate_ranges();
+        } else if (selector == "slider-slot-mapping") {
+            slider_visual_states_map_to_material_slots();
         } else {
             throw std::runtime_error("unknown test selector");
         }

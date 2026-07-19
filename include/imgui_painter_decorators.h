@@ -31,7 +31,7 @@ static_assert(IMGUI_VERSION_NUM == 19191,
 namespace ip {
 namespace detail {
 
-enum class Decorator { Button, Selectable, Checkbox, InputText };
+enum class Decorator { Button, Selectable, Checkbox, InputText, Slider };
 
 struct ItemState {
     ImVec2 min;
@@ -57,6 +57,9 @@ inline SuppressedColors suppressed_colors(Decorator decorator) {
         ImGuiCol_Header, ImGuiCol_HeaderHovered, ImGuiCol_HeaderActive};
     static constexpr ImGuiCol frame_colors[] = {
         ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive};
+    static constexpr ImGuiCol slider_colors[] = {
+        ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive,
+        ImGuiCol_SliderGrab, ImGuiCol_SliderGrabActive};
     switch (decorator) {
     case Decorator::Button:
         return {button_colors, static_cast<int>(std::size(button_colors))};
@@ -65,6 +68,8 @@ inline SuppressedColors suppressed_colors(Decorator decorator) {
     case Decorator::Checkbox:
     case Decorator::InputText:
         return {frame_colors, static_cast<int>(std::size(frame_colors))};
+    case Decorator::Slider:
+        return {slider_colors, static_cast<int>(std::size(slider_colors))};
     }
     return {nullptr, 0};
 }
@@ -83,6 +88,7 @@ inline std::optional<ip_rect> capture_chrome(Decorator decorator) {
         width = ImGui::GetFrameHeight();
         break;
     case Decorator::InputText:
+    case Decorator::Slider:
         width = ImGui::CalcItemWidth();
         break;
     }
@@ -157,6 +163,8 @@ inline ip_rect item_rect(const ItemState &state) {
 
 inline float rect_height(ip_rect value) { return value.max.y - value.min.y; }
 
+inline float rect_width(ip_rect value) { return value.max.x - value.min.x; }
+
 inline bool rect_is_valid(ip_rect value) {
     return std::isfinite(value.min.x) && std::isfinite(value.min.y) &&
            std::isfinite(value.max.x) && std::isfinite(value.max.y) &&
@@ -174,6 +182,60 @@ inline bool rect_contains(ip_rect outer, ip_rect inner) {
 struct SingleAnatomy {
     ip_rect chrome;
 };
+
+struct SliderAnatomy {
+    ip_rect frame;
+    ip_rect track;
+    ip_rect fill;
+    ip_rect grab;
+};
+
+inline float normalized_linear(float value, float min, float max) {
+    assert(std::isfinite(value) && std::isfinite(min) && std::isfinite(max));
+    if (!std::isfinite(value) || !std::isfinite(min) || !std::isfinite(max) ||
+        min == max) {
+        return 0.0f;
+    }
+    return std::clamp((value - min) / (max - min), 0.0f, 1.0f);
+}
+
+inline SliderAnatomy slider_anatomy(ip_rect frame, float min, float max,
+                                    float value, float grab_min_size,
+                                    float framebuffer_scale) {
+    constexpr float grab_padding = 2.0f;
+    const float frame_width = std::max(rect_width(frame), 0.0f);
+    const float frame_height = std::max(rect_height(frame), 0.0f);
+    const float slider_size = std::max(frame_width - grab_padding * 2.0f, 0.0f);
+    const float grab_size =
+        std::min(std::max(grab_min_size, 0.0f), slider_size);
+    const float usable_size = std::max(slider_size - grab_size, 0.0f);
+    const float usable_min = frame.min.x + grab_padding + grab_size * 0.5f;
+    const float grab_center =
+        usable_min + usable_size * normalized_linear(value, min, max);
+    const ip_rect grab{
+        {grab_center - grab_size * 0.5f,
+         std::min(frame.min.y + grab_padding, frame.max.y)},
+        {grab_center + grab_size * 0.5f,
+         std::max(frame.max.y - grab_padding, frame.min.y)}};
+
+    const float device_pixel =
+        std::isfinite(framebuffer_scale) && framebuffer_scale > 0.0f
+            ? 1.0f / framebuffer_scale
+            : 1.0f;
+    const float track_height = std::min(
+        std::max(frame_height * 0.25f, device_pixel * 2.0f), frame_height);
+    const float track_y = (frame.min.y + frame.max.y) * 0.5f;
+    const ip_rect track{
+        {std::min(frame.min.x + grab_padding, frame.max.x),
+         track_y - track_height * 0.5f},
+        {std::max(frame.max.x - grab_padding, frame.min.x),
+         track_y + track_height * 0.5f}};
+    const ip_rect fill{
+        {track.min.x, track.min.y},
+        {std::clamp(grab_center, track.min.x, track.max.x), track.max.y}};
+
+    return {frame, track, fill, grab};
+}
 
 inline SingleAnatomy single_anatomy(Decorator decorator, const ItemState &state,
                                     const std::optional<ip_rect> &captured) {
@@ -206,6 +268,48 @@ inline ip_shadow resolved_shadow(ip_shadow shadow, float alpha) {
 
 inline ip_color state_fill(const StateColors &colors, const ItemState &state) {
     return state.active ? colors.active : (state.hovered ? colors.hover : colors.base);
+}
+
+enum class StateColorSlot { Base, Hover, Active };
+
+inline ip_color state_color(const StateColors &colors, StateColorSlot slot) {
+    switch (slot) {
+    case StateColorSlot::Base:
+        return colors.base;
+    case StateColorSlot::Hover:
+        return colors.hover;
+    case StateColorSlot::Active:
+        return colors.active;
+    }
+    return colors.base;
+}
+
+enum class SliderVisualState { Adjusting, Focused, Hovered, Idle };
+
+inline SliderVisualState slider_visual_state(const ItemState &state) {
+    if (state.active) {
+        return SliderVisualState::Adjusting;
+    }
+    if (state.focused) {
+        return SliderVisualState::Focused;
+    }
+    if (state.hovered) {
+        return SliderVisualState::Hovered;
+    }
+    return SliderVisualState::Idle;
+}
+
+inline StateColorSlot slider_state_color_slot(SliderVisualState state) {
+    switch (state) {
+    case SliderVisualState::Idle:
+        return StateColorSlot::Base;
+    case SliderVisualState::Hovered:
+    case SliderVisualState::Focused:
+        return StateColorSlot::Hover;
+    case SliderVisualState::Adjusting:
+        return StateColorSlot::Active;
+    }
+    return StateColorSlot::Base;
 }
 
 enum class SelectableVisualState { Pressed, Selected, Hovered, Idle };
@@ -257,6 +361,29 @@ void paint_material(Canvas<DrawList> &canvas, ip_rect rect,
                     const Material &material, const ItemState &state) {
     paint_material_color(canvas, rect, material, state_fill(material.fill, state),
                          state.style_alpha);
+}
+
+template <typename DrawList>
+void paint_material_slot(Canvas<DrawList> &canvas, ip_rect rect,
+                         const Material &material, StateColorSlot slot,
+                         float style_alpha) {
+    paint_material_color(canvas, rect, material,
+                         state_color(material.fill, slot), style_alpha);
+}
+
+template <typename DrawList>
+void paint_slider(Canvas<DrawList> &canvas, const SliderAnatomy &anatomy,
+                  const SliderStyle &style, const ItemState &state,
+                  SliderVisualState visual_state) {
+    const StateColorSlot slot = slider_state_color_slot(visual_state);
+    paint_material_slot(canvas, anatomy.track, style.track, slot,
+                        state.style_alpha);
+    if (rect_width(anatomy.fill) > 0.0f) {
+        paint_material_slot(canvas, anatomy.fill, style.fill, slot,
+                            state.style_alpha);
+    }
+    paint_material_slot(canvas, anatomy.grab, style.grab, slot,
+                        state.style_alpha);
 }
 
 template <typename Widget, typename Paint>
@@ -337,6 +464,31 @@ auto decorate_input_text(Frame &frame, const Material &material, Widget &&widget
             const detail::SingleAnatomy anatomy = detail::single_anatomy(
                 detail::Decorator::InputText, state, captured);
             detail::paint_material(canvas, anatomy.chrome, material, state);
+        });
+}
+
+/* Decorates one horizontal linear f32 Slider, painting its track, fill, and
+ * grab. The closure must submit exactly one Slider using this value/range. */
+template <typename Widget>
+bool decorate_slider_f32(Frame &frame, const SliderStyle &style, float min,
+                         float max, float &value, Widget &&widget) {
+    return detail::item_paint(
+        frame, detail::Decorator::Slider,
+        [&value, &widget] { return std::forward<Widget>(widget)(value); },
+        [&style, min, max, &value](const detail::ItemState &state,
+                                  const std::optional<ip_rect> &captured,
+                                  auto &canvas) {
+            /* value() rather than assert + operator*: the reference fails
+             * hard here in release too, and dereferencing an empty optional
+             * would be undefined behaviour rather than a diagnosable one.
+             * Matches single_anatomy's handling of the same invariant. */
+            const ip_rect frame_rect = captured.value();
+            const detail::SliderAnatomy anatomy = detail::slider_anatomy(
+                frame_rect, min, max, value, ImGui::GetStyle().GrabMinSize,
+                ImGui::GetIO().DisplayFramebufferScale.x);
+            assert(detail::rect_contains(detail::item_rect(state), frame_rect));
+            detail::paint_slider(canvas, anatomy, style, state,
+                                 detail::slider_visual_state(state));
         });
 }
 

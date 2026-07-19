@@ -24,3 +24,13 @@ add_test(NAME decoration_preserves_last_item_queries
     COMMAND imgui_painter_decorator_tests last-item)
 add_test(NAME exception_restores_style_colors_and_draw_channels
     COMMAND imgui_painter_decorator_tests exception-safety)
+add_test(NAME slider_grab_padding_ignores_framebuffer_scale
+    COMMAND imgui_painter_decorator_tests slider-grab-padding)
+add_test(NAME slider_track_minimum_uses_framebuffer_scale_only
+    COMMAND imgui_painter_decorator_tests slider-track-minimum)
+add_test(NAME slider_anatomy_scales_with_logical_style_metrics
+    COMMAND imgui_painter_decorator_tests slider-logical-scale)
+add_test(NAME slider_anatomy_maps_values_and_degenerate_ranges
+    COMMAND imgui_painter_decorator_tests slider-value-mapping)
+add_test(NAME slider_visual_states_map_to_material_slots
+    COMMAND imgui_painter_decorator_tests slider-slot-mapping)
