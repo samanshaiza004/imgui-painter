@@ -178,6 +178,48 @@ void draw_widget_decorators(ip::Frame &frame) {
                                       1.0f);
         });
     ImGui::EndDisabled();
+
+    const ip::ComboStyle combo = ip::combo_field(palette);
+    static int mode = 0;
+    constexpr std::array<const char *, 3> modes{"Clean", "Warm", "Bright"};
+    ip::decorate_combo(
+        frame, combo,
+        [&] { return ImGui::BeginCombo("Decorated mode", modes[mode]); },
+        [&] {
+            for (int index = 0; index < static_cast<int>(modes.size()); ++index) {
+                const bool selected = mode == index;
+                if (ImGui::Selectable(modes[index], selected)) {
+                    mode = index;
+                }
+                if (selected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+        });
+
+    const ip::TreeStyle tree = ip::browser_tree_row(palette);
+    constexpr ImGuiTreeNodeFlags branch_flags =
+        ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow |
+        ImGuiTreeNodeFlags_DefaultOpen;
+    constexpr ImGuiTreeNodeFlags leaf_flags =
+        ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow |
+        ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    const bool root_open = ip::decorate_tree_node(
+        frame, tree, false, false,
+        [&] { return ImGui::TreeNodeEx("Expandable parent", branch_flags); });
+    if (root_open) {
+        const bool branch_open = ip::decorate_tree_node(
+            frame, tree, false, false,
+            [&] { return ImGui::TreeNodeEx("Nested child", branch_flags); });
+        if (branch_open) {
+            ip::decorate_tree_node(frame, tree, false, true, [&] {
+                return ImGui::TreeNodeEx("Leaf (no disclosure region)",
+                                         leaf_flags);
+            });
+            ImGui::TreePop();
+        }
+        ImGui::TreePop();
+    }
 }
 
 void draw_gallery(ip::Context &context, const demo::Backend &backend) {

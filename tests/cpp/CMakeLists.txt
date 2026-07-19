@@ -34,3 +34,13 @@ add_test(NAME slider_anatomy_maps_values_and_degenerate_ranges
     COMMAND imgui_painter_decorator_tests slider-value-mapping)
 add_test(NAME slider_visual_states_map_to_material_slots
     COMMAND imgui_painter_decorator_tests slider-slot-mapping)
+add_test(NAME combo_anatomy_partitions_without_gap_or_overlap
+    COMMAND imgui_painter_decorator_tests combo-anatomy)
+add_test(NAME tree_anatomy_handles_leaf_and_clamps_disclosure
+    COMMAND imgui_painter_decorator_tests tree-anatomy)
+add_test(NAME combo_visual_states_map_to_material_slots
+    COMMAND imgui_painter_decorator_tests combo-slot-mapping)
+add_test(NAME tree_visual_states_map_to_material_slots
+    COMMAND imgui_painter_decorator_tests tree-slot-mapping)
+add_test(NAME combo_restores_parent_colors_before_popup_contents
+    COMMAND imgui_painter_decorator_tests combo-color-ordering)

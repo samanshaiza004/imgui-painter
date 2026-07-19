@@ -72,6 +72,9 @@ void decorators_suppress_expected_color_families() {
     constexpr ImGuiCol slider[] = {
         ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive,
         ImGuiCol_SliderGrab, ImGuiCol_SliderGrabActive};
+    constexpr ImGuiCol combo[] = {
+        ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive,
+        ImGuiCol_Button, ImGuiCol_ButtonHovered, ImGuiCol_ButtonActive};
 
     require_same_colors(ip::detail::Decorator::Button, button,
                         "Button suppression family is wrong");
@@ -83,6 +86,10 @@ void decorators_suppress_expected_color_families() {
                         "InputText suppression family is wrong");
     require_same_colors(ip::detail::Decorator::Slider, slider,
                         "Slider suppression family is wrong");
+    require_same_colors(ip::detail::Decorator::Combo, combo,
+                        "Combo suppression family is wrong");
+    require_same_colors(ip::detail::Decorator::Tree, header,
+                        "Tree suppression family is wrong");
 }
 
 bool same_rect(ip_rect a, ip_rect b) {
@@ -91,6 +98,95 @@ bool same_rect(ip_rect a, ip_rect b) {
 }
 
 float center_x(ip_rect rect) { return (rect.min.x + rect.max.x) * 0.5f; }
+
+void combo_anatomy_partitions_without_gap_or_overlap() {
+    const ip_rect frame{{2.0f, 3.0f}, {102.0f, 23.0f}};
+    const ip::detail::ComboAnatomy anatomy =
+        ip::detail::combo_anatomy(frame);
+    require(anatomy.preview.max.x == anatomy.arrow.min.x,
+            "Combo preview and arrow do not share a boundary");
+    require(ip::detail::rect_width(anatomy.arrow) == 20.0f,
+            "Combo arrow is not square");
+    require(ip::detail::rect_contains(frame, anatomy.preview),
+            "Combo preview escaped the frame");
+    require(ip::detail::rect_contains(frame, anatomy.arrow),
+            "Combo arrow escaped the frame");
+
+    const ip_rect narrow{{4.0f, 5.0f}, {14.0f, 35.0f}};
+    const ip::detail::ComboAnatomy narrow_anatomy =
+        ip::detail::combo_anatomy(narrow);
+    require(ip::detail::rect_width(narrow_anatomy.arrow) == 10.0f,
+            "Narrow Combo arrow did not clamp to the frame width");
+    require(narrow_anatomy.preview.max.x == narrow_anatomy.arrow.min.x,
+            "Narrow Combo partition has a gap or overlap");
+    require(ip::detail::rect_contains(narrow, narrow_anatomy.arrow),
+            "Narrow Combo arrow escaped the frame");
+}
+
+void tree_anatomy_handles_leaf_and_clamps_disclosure() {
+    const ip_rect row{{10.0f, 20.0f}, {110.0f, 40.0f}};
+    const ip::detail::TreeAnatomy leaf =
+        ip::detail::tree_anatomy(row, true, 18.0f);
+    require(!leaf.disclosure.has_value(),
+            "Leaf TreeNode unexpectedly has disclosure chrome");
+
+    const ip::detail::TreeAnatomy branch =
+        ip::detail::tree_anatomy(row, false, 18.0f);
+    require(branch.disclosure.has_value(),
+            "Non-leaf TreeNode has no disclosure chrome");
+    require(ip::detail::rect_contains(row, *branch.disclosure),
+            "TreeNode disclosure escaped the row");
+
+    const ip::detail::TreeAnatomy clamped =
+        ip::detail::tree_anatomy(row, false, 10000.0f);
+    require(clamped.disclosure->max.x == row.max.x,
+            "TreeNode disclosure did not clamp to the row's right edge");
+    require(ip::detail::rect_contains(row, *clamped.disclosure),
+            "Clamped TreeNode disclosure escaped the row");
+}
+
+void combo_visual_states_map_to_material_slots() {
+    using ip::detail::ComboVisualState;
+    using ip::detail::StateColorSlot;
+    require(ip::detail::combo_state_color_slot(ComboVisualState::Idle) ==
+                StateColorSlot::Base,
+            "Idle Combo state did not map to Base");
+    require(ip::detail::combo_state_color_slot(ComboVisualState::Hovered) ==
+                StateColorSlot::Hover,
+            "Hovered Combo state did not map to Hover");
+    require(ip::detail::combo_state_color_slot(ComboVisualState::Focused) ==
+                StateColorSlot::Hover,
+            "Focused Combo state did not map to Hover");
+    require(ip::detail::combo_state_color_slot(ComboVisualState::Pressed) ==
+                StateColorSlot::Active,
+            "Pressed Combo state did not map to Active");
+    require(ip::detail::combo_state_color_slot(ComboVisualState::Open) ==
+                StateColorSlot::Active,
+            "Open Combo state did not map to Active");
+}
+
+void tree_visual_states_map_to_material_slots() {
+    using ip::detail::StateColorSlot;
+    using ip::detail::TreeVisualState;
+    require(ip::detail::tree_state_color_slot(TreeVisualState::Idle) ==
+                StateColorSlot::Base,
+            "Idle Tree state did not map to Base");
+    require(ip::detail::tree_state_color_slot(TreeVisualState::Open) ==
+                StateColorSlot::Base,
+            "Open Tree state did not deliberately map to Base");
+    require(ip::detail::tree_state_color_slot(TreeVisualState::Hovered) ==
+                StateColorSlot::Hover,
+            "Hovered Tree state did not map to Hover");
+    require(ip::detail::tree_state_color_slot(TreeVisualState::Focused) ==
+                StateColorSlot::Hover,
+            "Focused Tree state did not map to Hover");
+    require(ip::detail::tree_state_color_slot(TreeVisualState::Selected) ==
+                StateColorSlot::Active,
+            "Selected Tree state did not map to Active");
+    require(ip::detail::tree_state_color_slot(TreeVisualState::Pressed) ==
+                StateColorSlot::Active,
+            "Pressed Tree state did not map to Active");
+}
 
 void slider_grab_padding_ignores_framebuffer_scale() {
     const ip_rect frame{{0.0f, 0.0f}, {100.0f, 20.0f}};
@@ -327,6 +423,44 @@ void exception_restores_style_colors_and_draw_channels() {
     ImGui::DestroyContext();
 }
 
+void combo_restores_parent_colors_before_popup_contents() {
+    initialize_context();
+    ImGui::NewFrame();
+    ip::Context painter;
+    const ImVec2 uv = ImGui::GetFontTexUvWhitePixel();
+    auto frame = painter.begin_frame({uv.x, uv.y});
+    begin_fixed_window("combo color restoration");
+
+    constexpr const char *label = "Mode";
+    const ImGuiID combo_id = ImGui::GetCurrentWindow()->GetID(label);
+    ImGui::OpenPopupEx(ImHashStr("##ComboPopup", 0, combo_id),
+                       ImGuiPopupFlags_None);
+    const int before_depth = GImGui->ColorStack.Size;
+    const ImVec4 before_frame_bg =
+        ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
+    bool contents_ran = false;
+    const ip::ComboStyle style{material, material};
+    const bool popup_open = ip::decorate_combo(
+        frame, style, [&] { return ImGui::BeginCombo(label, "Clean"); }, [&] {
+            contents_ran = true;
+            require(GImGui->ColorStack.Size == before_depth,
+                    "Combo colors remained pushed inside popup contents");
+            const ImVec4 inside =
+                ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
+            require(inside.x == before_frame_bg.x &&
+                        inside.y == before_frame_bg.y &&
+                        inside.z == before_frame_bg.z &&
+                        inside.w == before_frame_bg.w,
+                    "Popup contents inherited transparent Combo colors");
+        });
+    require(popup_open, "Combo popup did not open for the ordering test");
+    require(contents_ran, "Combo popup contents did not run");
+
+    ImGui::End();
+    ImGui::Render();
+    ImGui::DestroyContext();
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -351,6 +485,16 @@ int main(int argc, char **argv) {
             slider_anatomy_maps_values_and_degenerate_ranges();
         } else if (selector == "slider-slot-mapping") {
             slider_visual_states_map_to_material_slots();
+        } else if (selector == "combo-anatomy") {
+            combo_anatomy_partitions_without_gap_or_overlap();
+        } else if (selector == "tree-anatomy") {
+            tree_anatomy_handles_leaf_and_clamps_disclosure();
+        } else if (selector == "combo-slot-mapping") {
+            combo_visual_states_map_to_material_slots();
+        } else if (selector == "tree-slot-mapping") {
+            tree_visual_states_map_to_material_slots();
+        } else if (selector == "combo-color-ordering") {
+            combo_restores_parent_colors_before_popup_contents();
         } else {
             throw std::runtime_error("unknown test selector");
         }

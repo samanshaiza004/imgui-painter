@@ -31,7 +31,15 @@ static_assert(IMGUI_VERSION_NUM == 19191,
 namespace ip {
 namespace detail {
 
-enum class Decorator { Button, Selectable, Checkbox, InputText, Slider };
+enum class Decorator {
+    Button,
+    Selectable,
+    Checkbox,
+    InputText,
+    Slider,
+    Combo,
+    Tree
+};
 
 struct ItemState {
     ImVec2 min;
@@ -60,16 +68,22 @@ inline SuppressedColors suppressed_colors(Decorator decorator) {
     static constexpr ImGuiCol slider_colors[] = {
         ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive,
         ImGuiCol_SliderGrab, ImGuiCol_SliderGrabActive};
+    static constexpr ImGuiCol combo_colors[] = {
+        ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive,
+        ImGuiCol_Button, ImGuiCol_ButtonHovered, ImGuiCol_ButtonActive};
     switch (decorator) {
     case Decorator::Button:
         return {button_colors, static_cast<int>(std::size(button_colors))};
     case Decorator::Selectable:
+    case Decorator::Tree:
         return {header_colors, static_cast<int>(std::size(header_colors))};
     case Decorator::Checkbox:
     case Decorator::InputText:
         return {frame_colors, static_cast<int>(std::size(frame_colors))};
     case Decorator::Slider:
         return {slider_colors, static_cast<int>(std::size(slider_colors))};
+    case Decorator::Combo:
+        return {combo_colors, static_cast<int>(std::size(combo_colors))};
     }
     return {nullptr, 0};
 }
@@ -83,12 +97,14 @@ inline std::optional<ip_rect> capture_chrome(Decorator decorator) {
     switch (decorator) {
     case Decorator::Button:
     case Decorator::Selectable:
+    case Decorator::Tree:
         return std::nullopt;
     case Decorator::Checkbox:
         width = ImGui::GetFrameHeight();
         break;
     case Decorator::InputText:
     case Decorator::Slider:
+    case Decorator::Combo:
         width = ImGui::CalcItemWidth();
         break;
     }
@@ -190,6 +206,39 @@ struct SliderAnatomy {
     ip_rect grab;
 };
 
+struct ComboAnatomy {
+    ip_rect frame;
+    ip_rect preview;
+    ip_rect arrow;
+};
+
+struct TreeAnatomy {
+    ip_rect row;
+    std::optional<ip_rect> disclosure;
+};
+
+inline ComboAnatomy combo_anatomy(ip_rect frame) {
+    const float arrow_width =
+        std::min(std::max(rect_height(frame), 0.0f),
+                 std::max(rect_width(frame), 0.0f));
+    const float split = frame.max.x - arrow_width;
+    return {frame,
+            {{frame.min.x, frame.min.y}, {split, frame.max.y}},
+            {{split, frame.min.y}, {frame.max.x, frame.max.y}}};
+}
+
+inline TreeAnatomy tree_anatomy(ip_rect row, bool leaf,
+                                float disclosure_width) {
+    std::optional<ip_rect> disclosure;
+    if (!leaf) {
+        disclosure = ip_rect{
+            {row.min.x, row.min.y},
+            {std::min(row.min.x + std::max(disclosure_width, 0.0f), row.max.x),
+             row.max.y}};
+    }
+    return {row, disclosure};
+}
+
 inline float normalized_linear(float value, float min, float max) {
     assert(std::isfinite(value) && std::isfinite(min) && std::isfinite(max));
     if (!std::isfinite(value) || !std::isfinite(min) || !std::isfinite(max) ||
@@ -285,6 +334,80 @@ inline ip_color state_color(const StateColors &colors, StateColorSlot slot) {
 }
 
 enum class SliderVisualState { Adjusting, Focused, Hovered, Idle };
+
+enum class ComboVisualState { Open, Pressed, Focused, Hovered, Idle };
+
+inline ComboVisualState combo_visual_state(const ItemState &state,
+                                           bool popup_open) {
+    if (popup_open) {
+        return ComboVisualState::Open;
+    }
+    if (state.active) {
+        return ComboVisualState::Pressed;
+    }
+    if (state.focused) {
+        return ComboVisualState::Focused;
+    }
+    if (state.hovered) {
+        return ComboVisualState::Hovered;
+    }
+    return ComboVisualState::Idle;
+}
+
+inline StateColorSlot combo_state_color_slot(ComboVisualState state) {
+    switch (state) {
+    case ComboVisualState::Idle:
+        return StateColorSlot::Base;
+    case ComboVisualState::Hovered:
+    case ComboVisualState::Focused:
+        return StateColorSlot::Hover;
+    case ComboVisualState::Open:
+    case ComboVisualState::Pressed:
+        return StateColorSlot::Active;
+    }
+    return StateColorSlot::Base;
+}
+
+enum class TreeVisualState { Pressed, Selected, Focused, Hovered, Open, Idle };
+
+/* Open ranks below Hovered/Focused: openness is already communicated by the
+ * disclosure arrow, and letting it outrank hover made expanded rows feel
+ * inert. It stays a named state (currently painting like Idle) so a future
+ * distinct open treatment needs no re-plumbing. */
+inline TreeVisualState tree_visual_state(const ItemState &state, bool selected,
+                                         bool open) {
+    if (state.active) {
+        return TreeVisualState::Pressed;
+    }
+    if (selected) {
+        return TreeVisualState::Selected;
+    }
+    if (state.focused) {
+        return TreeVisualState::Focused;
+    }
+    if (state.hovered) {
+        return TreeVisualState::Hovered;
+    }
+    if (open) {
+        return TreeVisualState::Open;
+    }
+    return TreeVisualState::Idle;
+}
+
+inline StateColorSlot tree_state_color_slot(TreeVisualState state) {
+    switch (state) {
+    case TreeVisualState::Idle:
+    case TreeVisualState::Open:
+        return StateColorSlot::Base;
+    case TreeVisualState::Hovered:
+    case TreeVisualState::Focused:
+        return StateColorSlot::Hover;
+    case TreeVisualState::Pressed:
+    case TreeVisualState::Selected:
+        return StateColorSlot::Active;
+    }
+    return StateColorSlot::Base;
+}
 
 inline SliderVisualState slider_visual_state(const ItemState &state) {
     if (state.active) {
@@ -489,6 +612,82 @@ bool decorate_slider_f32(Frame &frame, const SliderStyle &style, float min,
             assert(detail::rect_contains(detail::item_rect(state), frame_rect));
             detail::paint_slider(canvas, anatomy, style, state,
                                  detail::slider_visual_state(state));
+        });
+}
+
+/* Decorates one BeginCombo and, when open, runs its popup contents before
+ * calling EndCombo. Suppressed parent colors are restored before contents
+ * run, and the parent item state is captured only after EndCombo restores it.
+ * Returns whether the popup was open. */
+template <typename Begin, typename Contents>
+bool decorate_combo(Frame &frame, const ComboStyle &style, Begin &&begin,
+                    Contents &&contents) {
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    const ip_rect frame_rect =
+        detail::capture_chrome(detail::Decorator::Combo).value();
+    detail::ChannelSplitGuard channels(draw_list);
+    detail::StyleColorGuard colors(detail::Decorator::Combo);
+
+    const bool popup_open = std::forward<Begin>(begin)();
+    colors.restore();
+    if (popup_open) {
+        try {
+            std::forward<Contents>(contents)();
+        } catch (...) {
+            ImGui::EndCombo();
+            throw;
+        }
+        ImGui::EndCombo();
+    }
+
+    const detail::ItemState state = detail::capture_item_state();
+    assert(detail::rect_contains(detail::item_rect(state), frame_rect));
+    const detail::ComboAnatomy anatomy = detail::combo_anatomy(frame_rect);
+    const detail::StateColorSlot slot = detail::combo_state_color_slot(
+        detail::combo_visual_state(state, popup_open));
+
+    channels.background();
+    {
+        auto canvas = frame.canvas(*draw_list);
+        detail::paint_material_slot(canvas, anatomy.frame, style.frame, slot,
+                                    state.style_alpha);
+        detail::paint_material_slot(canvas, anatomy.arrow, style.arrow_region,
+                                    slot, state.style_alpha);
+    }
+    channels.merge();
+    return popup_open;
+}
+
+/* Decorates one TreeNodeEx row. selected and leaf must match its flags.
+ * Non-leaves must use SpanAvailWidth | OpenOnArrow; leaves must additionally
+ * use Leaf | NoTreePushOnOpen. Parent channels are merged before callers draw
+ * children. When a non-leaf returns true, the caller remains responsible for
+ * TreePop after drawing those children. */
+template <typename Widget>
+bool decorate_tree_node(Frame &frame, const TreeStyle &style, bool selected,
+                        bool leaf, Widget &&widget) {
+    bool open = false;
+    return detail::item_paint(
+        frame, detail::Decorator::Tree,
+        [&open, &widget] {
+            open = std::forward<Widget>(widget)();
+            return open;
+        },
+        [&style, selected, leaf, &open](
+            const detail::ItemState &state,
+            const std::optional<ip_rect> &, auto &canvas) {
+            const detail::TreeAnatomy anatomy = detail::tree_anatomy(
+                detail::item_rect(state), leaf,
+                ImGui::GetTreeNodeToLabelSpacing());
+            const detail::StateColorSlot slot = detail::tree_state_color_slot(
+                detail::tree_visual_state(state, selected, open));
+            detail::paint_material_slot(canvas, anatomy.row, style.row, slot,
+                                        state.style_alpha);
+            if (anatomy.disclosure) {
+                detail::paint_material_slot(canvas, *anatomy.disclosure,
+                                            style.disclosure, slot,
+                                            state.style_alpha);
+            }
         });
 }
 
