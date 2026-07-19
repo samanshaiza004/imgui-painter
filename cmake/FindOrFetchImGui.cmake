@@ -1,7 +1,15 @@
 #[[
 This module respects an existing `imgui` target, then a caller-supplied
 checkout, and only otherwise fetches Dear ImGui. The fallback is pinned to
-the 1.91.9b docking release that matches imgui-painter's host binding.
+the plain (non-docking) 1.91.9b release: the pinned Rust binding depends on
+plain `imgui-sys = "0.12"` with no `docking` feature enabled anywhere in
+this workspace, so imgui-sys's build.rs compiles its `third-party/imgui-master`
+tree (see its docking_enabled branch), not `third-party/imgui-docking` --
+confirmed by reading imgui-sys's build.rs and Cargo.lock directly, and by
+the non-docking `ImGuiCol_COUNT == 56` (no ImGuiCol_DockingPreview/
+DockingEmptyBg) that the actually-compiled bindings.rs uses. Matching that
+exactly, not the docking branch, is what keeps this C++ layer's ImGuiCol_
+role coverage identical to what the Rust reference is verified against.
 ]]
 
 if(TARGET imgui)
@@ -14,7 +22,7 @@ else()
     include(FetchContent)
     FetchContent_Declare(imgui
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.91.9b-docking # Peeled commit: 4806a1924ff6181180bf5e4b8b79ab4394118875
+        GIT_TAG v1.91.9b # Commit: f5befd2d29e66809cd1110a152e375a7f1981f06
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(imgui)
