@@ -17,7 +17,9 @@ if(NOT DEFINED PROJECT_IS_TOP_LEVEL)
     endif()
 endif()
 
-option(IMGUI_PAINTER_BUILD_EXAMPLES "Build imgui-painter examples" ${PROJECT_IS_TOP_LEVEL})
+# Examples fetch full Dear ImGui and GLFW checkouts, so keep the default
+# core-only build fast and usable offline. Opt in explicitly when needed.
+option(IMGUI_PAINTER_BUILD_EXAMPLES "Build imgui-painter examples" OFF)
 option(IMGUI_PAINTER_BUILD_TESTS "Build imgui-painter tests" ${PROJECT_IS_TOP_LEVEL})
 
 set(IMGUI_PAINTER_SOURCES
@@ -104,3 +106,7 @@ export(EXPORT imgui-painterTargets
     FILE ${CMAKE_CURRENT_BINARY_DIR}/imgui-painterTargets.cmake
     NAMESPACE imgui_painter::
 )
+
+if(IMGUI_PAINTER_BUILD_EXAMPLES)
+    add_subdirectory(examples/cpp)
+endif()

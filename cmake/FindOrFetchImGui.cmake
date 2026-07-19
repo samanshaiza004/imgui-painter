@@ -37,4 +37,6 @@ add_library(imgui STATIC
 )
 target_include_directories(imgui PUBLIC "${_imgui_source_dir}")
 
-unset(_imgui_source_dir)
+# Documented for callers that need sources not built into the core target,
+# notably Dear ImGui's optional backend translation units.
+set(IMGUI_PAINTER_IMGUI_SOURCE_DIR "${_imgui_source_dir}")
