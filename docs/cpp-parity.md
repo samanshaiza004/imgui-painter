@@ -1,6 +1,17 @@
 # C++ parity plan
 
-What the C++ side needs in order to match what the Rust binding does today.
+What the C++ side needed in order to match what the Rust binding does.
+
+> **Status: items 1-6 are done.** CMake build, reusable per-frame context, automatic host-value
+> sampling, palette/recipes, GLFW + OpenGL3 examples, and all seven widget decorators have
+> landed. Item 7 (native C++ tests) is partially done — decorator behaviour and widget anatomy
+> have native coverage; the core geometry suite still runs only through the Rust harness.
+>
+> The anatomy formulas the decorator work reconstructed are now written down once, in
+> [widget-anatomy.md](widget-anatomy.md), which both bindings implement. The remaining
+> open decision below — whether C++ or Rust is the reference binding — is still open.
+>
+> This document is kept as the record of what the gap was and why each choice was made.
 
 This exists because the Rust binding got ahead by accident of history — it was the first
 consumer and the layer that proved the design — while Dear ImGui's own audience is
@@ -9,17 +20,17 @@ document is the list of things standing between that intent and reality.
 
 ## Current state
 
-| Capability | C++ | Rust | Where the gap lives |
+| Capability | C++ | Rust | Landed in |
 |---|---|---|---|
 | Painting core | ✅ | ✅ | — |
 | Fluent chaining | ✅ | ✅ | — |
-| Build system | ❌ | ✅ | new |
-| Reusable per-frame context | ❌ | ✅ | C++ wrapper only |
-| Automatic host-value sampling | ❌ | ✅ | new ImGui-aware header |
-| Widget decoration | ❌ | ✅ | new ImGui-aware header |
-| Palette / recipes | ❌ | ✅ | C++ port, pure data |
-| Examples / visual demo | ❌ | ✅ | new |
-| Native tests | ❌ | ✅ | new |
+| Build system | ✅ | ✅ | `75f3342` CMake |
+| Reusable per-frame context | ✅ | ✅ | `d61ffae` `Context`/`Frame`/`Canvas` |
+| Automatic host-value sampling | ✅ | ✅ | `bd15ad1` `imgui_painter_imgui.h` |
+| Widget decoration | ✅ | ✅ | `938fb4f` `bfb3a1b` `943ed8f` `40fe797` |
+| Palette / recipes | ✅ | ✅ | `5a52ddb` `imgui_painter_recipes.h` |
+| Examples / visual demo | ✅ | ✅ | `0d73264` GLFW + OpenGL3 |
+| Native tests | ◐ | ✅ | decorators covered; core geometry pending |
 
 Good news up front: **no gap below requires changing the C++ core or the C ABI.** Everything
 missing is a layer above them. The core already supports what's needed — for instance

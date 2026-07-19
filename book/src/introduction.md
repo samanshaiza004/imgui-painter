@@ -72,12 +72,16 @@ That is a real `ImGui::Button()`. It keeps its ID, layout, input handling, keybo
 navigation, and return value; imgui-painter suppresses only the chrome it replaces and paints
 behind it.
 
-> **This layer exists only in the Rust binding today.** The C++ side has the painting core and
-> the fluent wrapper, but no decorators yet. Everything required to build them is public Dear
-> ImGui C++ API, so it is pending work rather than a technical obstacle — see the
-> [parity plan](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md).
+> **Available in both bindings**, covering Button, Selectable, Checkbox, InputText, Slider,
+> Combo, and TreeNode.
 >
-> The Rust binding got ahead because it was the first consumer and the layer that proved the
+> The two implementations cannot share code: the geometry formulas read Dear ImGui's own layout
+> state, which lives on whichever side of the FFI boundary owns the context. Both therefore
+> implement one written spec —
+> [widget anatomy](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/widget-anatomy.md)
+> — so they cannot drift silently.
+>
+> The Rust binding got here first because it was the first consumer and the layer that proved the
 > design, not because the design favors it. The C ABI exists so every binding can sit on equal
 > footing.
 

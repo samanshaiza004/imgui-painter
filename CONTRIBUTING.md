@@ -19,11 +19,20 @@ cargo build --examples
 Every change must pass all of these, in order:
 
 ```sh
+# Rust binding
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace
 cargo test --workspace --no-default-features
 cargo build --examples
+
+# C++ — the default build is core-only, needs no network, and must stay that way
+cmake -B build && cmake --build build
+
+# C++ tests and examples are opt-in because they fetch Dear ImGui and GLFW
+cmake -B build-t -DIMGUI_PAINTER_BUILD_TESTS=ON && cmake --build build-t
+ctest --test-dir build-t --output-on-failure
+cmake -B build-ex -DIMGUI_PAINTER_BUILD_EXAMPLES=ON && cmake --build build-ex
 ```
 
 `--no-default-features` is not a formality. It disables the `decorators` feature
@@ -34,6 +43,14 @@ decorators, the layering has been broken — fix the layering, don't relax the t
 Automated tests cover mesh geometry, lifecycle cleanup, and composition
 invariants. They do **not** cover final rasterized appearance, which is why the
 visual gate below exists and cannot be skipped.
+
+Changes touching **widget chrome geometry** have an extra requirement: the
+formulas are specified once in [docs/widget-anatomy.md](docs/widget-anatomy.md)
+and implemented twice, in `bindings/rust/src/item_paint.rs` and
+`include/imgui_painter_decorators.h`. Update the spec first, then both
+implementations, then run the visual gate on **both** rendering paths. The two
+cannot share code — the formulas read Dear ImGui's own layout state — so the
+document is the only thing keeping them from drifting.
 
 ## The visual gate
 

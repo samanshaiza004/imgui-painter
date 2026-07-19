@@ -1,10 +1,10 @@
 # The compatibility contract
 
-> This layer currently exists only in the Rust binding. Everything needed to
-> build it in C++ is public Dear ImGui API: `ImDrawList::ChannelsSplit`,
-> `PushStyleColor`, `IsItemHovered`/`IsItemActive`, and
-> `GetItemRectMin`/`GetItemRectMax`. See the
-> [C++ parity plan](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md).
+> Available in **both** bindings, covering Button, Selectable, Checkbox,
+> InputText, Slider, Combo, and TreeNode. The two implementations cannot share
+> code — the geometry formulas read Dear ImGui's own layout state — so both
+> implement one spec:
+> [widget anatomy](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/widget-anatomy.md).
 
 Two guarantees matter when integrating decorators: what imgui-painter promises
 *you*, and what it needs from Dear ImGui.
@@ -111,4 +111,4 @@ builds.
 
 Publishing is therefore deferred until upstream imgui-rs ships 1.91.x. Until
 then, depend on it by git and apply the patch yourself, as shown in
-[Getting started](../getting-started.md#adding-the-dependency).
+[the Rust binding's setup](../rust/index.md#setup).

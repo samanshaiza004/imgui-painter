@@ -24,10 +24,10 @@ call order — no styling language, no cascade, no selectors.
 **What it is not:** a design system, a widget-set replacement, Qt, or CSS. It is closer to a
 2D rendering framework specialized for Dear ImGui than to "a styling helper."
 
-> **Status: early.** The C++ layer is the painting core plus a header-only fluent wrapper.
-> It has **no build system yet**, and the widget-decoration layer currently exists only in the
-> Rust binding. See [Project status](#project-status) — it is deliberately specific about what
-> does and does not exist.
+> **Status: pre-release.** C++ and Rust are now at feature parity — CMake build, reusable
+> per-frame context, automatic host-value sampling, all seven widget decorators, palette and
+> recipes, and GLFW + OpenGL3 examples. See [Project status](#project-status), which is
+> deliberately specific about what does and does not exist.
 
 ## Why
 
@@ -85,30 +85,67 @@ not covered by any ABI guarantee, and have changed across Dear ImGui versions.
 
 ## Using it from C++
 
-There is no build system yet, so add the sources to your own build:
+The library builds with CMake (3.16+, C++17). Consume it with `FetchContent`:
 
+```cmake
+include(FetchContent)
+FetchContent_Declare(imgui-painter
+    GIT_REPOSITORY https://github.com/samanshaiza004/imgui-painter.git
+    GIT_TAG        main   # pin to a tag once 0.1.0 is released
+)
+FetchContent_MakeAvailable(imgui-painter)
+target_link_libraries(your_app PRIVATE imgui_painter::imgui_painter)
 ```
-capi/imgui_painter_c.cpp
-src/painter.cpp
+
+or install it and use `find_package(imgui-painter REQUIRED)` against the same target. Either way
+the include is `#include <imgui_painter.h>`.
+
+Building the repo directly gives you the core library only — no network, no Dear ImGui, about two
+seconds:
+
+```sh
+cmake -B build && cmake --build build
 ```
 
-with `capi/` and `include/` on the include path, compiled as **C++17**. Then
-`#include "imgui_painter.h"`.
+Examples and tests are opt-in (`-DIMGUI_PAINTER_BUILD_EXAMPLES=ON`,
+`-DIMGUI_PAINTER_BUILD_TESTS=ON`) because they fetch full Dear ImGui and GLFW checkouts.
 
-Two host values must be supplied — neither can be guessed safely, and both are sampled
-automatically only by the Rust binding today:
+Which header you include decides whether you take a Dear ImGui dependency at all:
+
+| Header | Adds | Includes `imgui.h`? |
+|---|---|---|
+| `imgui_painter.h` | painting core, fluent API, `Context`/`Frame`/`Canvas` | no |
+| `imgui_painter_recipes.h` | `Palette`, material builders, `panel`/`inset_panel` | no |
+| `imgui_painter_imgui.h` | automatic host-value sampling, `apply_imgui_colors` | yes |
+| `imgui_painter_decorators.h` | the seven widget decorators | yes |
+
+The first two staying ImGui-free is load-bearing, not incidental: it is what lets `draw()` compile
+against any type exposing `PrimReserve`/`PrimWriteVtx`/`PrimWriteIdx`, which CI checks against a
+mock draw list.
+
+Two host values drive correct output, and neither can be guessed safely:
 
 | Value | Where it comes from | Why it matters |
 |---|---|---|
 | `white_pixel_uv` | `ImGui::GetFontTexUvWhitePixel()` | Flat and gradient fills sample your atlas's solid-white texel. A wrong UV samples the wrong texel with no visible error. |
 | `pixel_scale` | `ImGui::GetIO().DisplayFramebufferScale.x` | Sub-pixel hairlines are drawn at one device pixel with proportionally reduced alpha. Skipping it blurs bevels on HiDPI. |
 
-`ip_begin` resets the pixel scale to `1.0`, so set it *after* constructing the `Painter` — the
-fluent `.pixel_scale()` call above is already in the right place.
+`imgui_painter_imgui.h` samples both for you, once per frame:
 
-`ip::Painter` is **single-use**: it creates and destroys one `ip_ctx` per instance, so it is
-one object per shape. A reusable per-frame context is a known gap — see
-[Project status](#project-status).
+```cpp
+ip::Context ctx;                          // long-lived, owns one native context
+auto frame = ip::begin_frame(ctx);        // samples both host values
+auto canvas = ip::window_canvas(frame);   // targets the current window's draw list
+canvas.rounded_rect(rect, 6.0f).fill(surface).border({1.0f, outline});
+```
+
+`Context` is reused across the whole frame; a `Canvas` accumulates every shape drawn on it and
+submits once when it goes out of scope. `ip::Painter` remains available as the single-use
+convenience path for one-off shapes — it creates and destroys one native context per instance, so
+prefer `Context` when painting more than a couple of elements per frame.
+
+`ip_begin` resets the pixel scale to `1.0`, so set it *after* beginning a session — the fluent
+`.pixel_scale()` call above is already in the right place.
 
 ### Plain C
 
@@ -139,18 +176,25 @@ Being precise about this matters more than making the library sound finished.
 |---|---|---|
 | Painting core (shapes, gradients, shadows, borders, bands, lines) | ✅ | ✅ |
 | Fluent chaining API | ✅ | ✅ |
-| Build system | ❌ none | ✅ Cargo |
-| Reusable per-frame context | ❌ one context per shape | ✅ `Painter` → `Frame` → `Canvas` |
-| Host values sampled automatically | ❌ caller supplies | ✅ |
-| **Widget decoration** (restyle a stock `ImGui::Button`) | ❌ | ✅ |
-| Palette / recipes | ❌ | ✅ |
-| Examples and visual demo | ❌ | ✅ |
-| Tests | via the Rust binding | ✅ |
+| Build system | ✅ CMake | ✅ Cargo |
+| Reusable per-frame context | ✅ `Context` → `Frame` → `Canvas` | ✅ `Painter` → `Frame` → `Canvas` |
+| Host values sampled automatically | ✅ | ✅ |
+| **Widget decoration** (restyle a stock `ImGui::Button`) | ✅ all seven widgets | ✅ all seven widgets |
+| Palette / recipes | ✅ | ✅ |
+| Examples and visual demo | ✅ GLFW + OpenGL3 | ✅ wgpu + winit |
+| Tests | ✅ native, plus via the Rust binding | ✅ |
 
-The Rust binding is further along because it was the first consumer and the layer that proved
-the design. That is a historical accident, not the intended end state: the C ABI exists
-specifically so C++, C, Zig, C#, and Python bindings can sit on equal footing. What C++ needs
-in order to catch up is written up in **[docs/cpp-parity.md](docs/cpp-parity.md)**.
+Widget decoration covers Button, Selectable, Checkbox, InputText, Slider, Combo, and TreeNode in
+both bindings.
+
+The Rust binding got here first because it was the first consumer and the layer that proved the
+design. That was a historical accident, not the intended end state: the C ABI exists specifically
+so C++, C, Zig, C#, and Python bindings can sit on equal footing. The work that closed the gap is
+recorded in **[docs/cpp-parity.md](docs/cpp-parity.md)**.
+
+The two decorator implementations cannot share code — the geometry formulas read Dear ImGui's own
+layout state, which lives on whichever side owns the context. **[docs/widget-anatomy.md](docs/widget-anatomy.md)**
+is the single spec both implement, so they cannot drift silently.
 
 ### Compatibility
 

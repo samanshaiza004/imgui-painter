@@ -1,8 +1,8 @@
 # Recipes and palettes
 
-> Recipes and `Palette` currently exist only in the Rust binding. A C++ version
-> is a mechanical port: this layer is pure data and color arithmetic. See the
-> [C++ parity plan](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md).
+> Available in both bindings. In C++ the palette, colour maths, and material
+> builders live in the ImGui-free `imgui_painter_recipes.h`; only
+> `apply_imgui_colors` needs Dear ImGui and ships in `imgui_painter_imgui.h`.
 
 `recipes` is an optional convenience layer. It turns a small set of palette
 tokens into `Material`s and painted surfaces, so a host does not hand-author

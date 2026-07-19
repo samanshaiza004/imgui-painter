@@ -10,23 +10,30 @@ lives — see [the Rust overview](rust/index.md).
 
 ## Adding it to your build
 
-There is no build system in the repo yet (it's the first item on the
-[parity plan](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md)),
-so add the two core sources to your own build:
+The library builds with CMake (3.16+). Fetch it:
 
-```
-capi/imgui_painter_c.cpp
-src/painter.cpp
+```cmake
+include(FetchContent)
+FetchContent_Declare(imgui-painter
+    GIT_REPOSITORY https://github.com/samanshaiza004/imgui-painter.git
+    GIT_TAG        main   # pin to a tag once 0.1.0 is released
+)
+FetchContent_MakeAvailable(imgui-painter)
+target_link_libraries(your_app PRIVATE imgui_painter::imgui_painter)
 ```
 
-with `capi/` and `include/` on your include path. Then:
+or install it and use `find_package(imgui-painter REQUIRED)` against the same target. Then:
 
 ```cpp
 #include "imgui_painter.h"
 ```
 
+If you would rather not use CMake, adding `capi/imgui_painter_c.cpp` and `src/painter.cpp` to
+your own build with `capi/` and `include/` on the include path still works.
+
 The core compiles standalone — it includes no ImGui header — so it does not care which Dear
-ImGui version, backend, or build flags your application uses.
+ImGui version, backend, or build flags your application uses. That changes only if you opt into
+`imgui_painter_imgui.h` or `imgui_painter_decorators.h`, which do include `imgui.h`.
 
 ## Your first painted shape
 
@@ -109,14 +116,30 @@ Stop `t` values must ascend. Modes are `IP_GRADIENT_LINEAR`, `_RADIAL`, `_ANGULA
 
 ## Decorating stock widgets
 
-Not available from C++ yet. The layer that restyles a live `ImGui::Button()` — suppressing its
-chrome, splitting the draw list, and painting behind it — currently exists only in the
-[Rust binding](rust/index.md).
+Include `imgui_painter_decorators.h` and wrap a stock widget in a lambda:
 
-Everything needed to build it *is* public Dear ImGui C++ API (`ImDrawList::ChannelsSplit`,
-`PushStyleColor`, `IsItemHovered`/`IsItemActive`, `GetItemRectMin`/`Max`), so this is work not
-yet done rather than a technical obstacle. The plan is in
-[docs/cpp-parity.md](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md).
+```cpp
+#include "imgui_painter_decorators.h"
+
+ip::Context ctx;                                  // long-lived
+// ...per frame:
+auto frame = ip::begin_frame(ctx);
+const ip::Material material = ip::raised_button(palette);
+
+bool clicked = ip::decorate_button(frame, material, [] {
+    return ImGui::Button("Save");
+});
+```
+
+That is a real `ImGui::Button()`. It keeps its ID, layout, input handling, keyboard navigation,
+and return value — imgui-painter suppresses only the `ImGuiCol_` roles it replaces and paints
+behind it. All seven decorators (Button, Selectable, Checkbox, InputText, Slider, Combo,
+TreeNode) follow the same shape.
+
+The geometry these reconstruct is **not** an upstream Dear ImGui contract, so the C++ header
+pins to an exact version with a `static_assert`. See
+[the compatibility contract](decorators/contract.md) and
+[widget anatomy](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/widget-anatomy.md).
 
 In the meantime, painting panels, strips, wells, and backgrounds behind stock widgets works
 today — paint the surface first, then submit the widgets that sit on it.
