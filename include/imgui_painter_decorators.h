@@ -31,7 +31,7 @@ static_assert(IMGUI_VERSION_NUM == 19191,
 namespace ip {
 namespace detail {
 
-enum class Decorator { Button, Selectable };
+enum class Decorator { Button, Selectable, Checkbox, InputText };
 
 struct ItemState {
     ImVec2 min;
@@ -55,16 +55,41 @@ inline SuppressedColors suppressed_colors(Decorator decorator) {
         ImGuiCol_Button, ImGuiCol_ButtonHovered, ImGuiCol_ButtonActive};
     static constexpr ImGuiCol header_colors[] = {
         ImGuiCol_Header, ImGuiCol_HeaderHovered, ImGuiCol_HeaderActive};
-    if (decorator == Decorator::Button) {
+    static constexpr ImGuiCol frame_colors[] = {
+        ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive};
+    switch (decorator) {
+    case Decorator::Button:
         return {button_colors, static_cast<int>(std::size(button_colors))};
+    case Decorator::Selectable:
+        return {header_colors, static_cast<int>(std::size(header_colors))};
+    case Decorator::Checkbox:
+    case Decorator::InputText:
+        return {frame_colors, static_cast<int>(std::size(frame_colors))};
     }
-    return {header_colors, static_cast<int>(std::size(header_colors))};
+    return {nullptr, 0};
 }
 
-/* Kept as an explicit pre-submit operation even though Group 1 widgets use
- * their post-submit item rectangle. Later multipart decorators need this
- * exact call site to capture their chrome before submission. */
-inline std::optional<ip_rect> capture_chrome(Decorator) { return std::nullopt; }
+/* These formulas reproduce Dear ImGui 1.91.9b layout through public
+ * functions, but widget-part geometry is not an upstream contract. The
+ * executable compatibility gate and visual gallery must be rerun on every
+ * Dear ImGui bump. */
+inline std::optional<ip_rect> capture_chrome(Decorator decorator) {
+    float width = 0.0f;
+    switch (decorator) {
+    case Decorator::Button:
+    case Decorator::Selectable:
+        return std::nullopt;
+    case Decorator::Checkbox:
+        width = ImGui::GetFrameHeight();
+        break;
+    case Decorator::InputText:
+        width = ImGui::CalcItemWidth();
+        break;
+    }
+    const float height = ImGui::GetFrameHeight();
+    const ImVec2 min = ImGui::GetCursorScreenPos();
+    return ip_rect{{min.x, min.y}, {min.x + width, min.y + height}};
+}
 
 class StyleColorGuard {
 public:
@@ -150,11 +175,12 @@ struct SingleAnatomy {
     ip_rect chrome;
 };
 
-inline SingleAnatomy single_anatomy(const ItemState &state,
+inline SingleAnatomy single_anatomy(Decorator decorator, const ItemState &state,
                                     const std::optional<ip_rect> &captured) {
-    assert(!captured.has_value());
-    (void)captured;
-    const ip_rect chrome = item_rect(state);
+    const ip_rect chrome =
+        decorator == Decorator::Button || decorator == Decorator::Selectable
+            ? item_rect(state)
+            : captured.value();
     assert(rect_is_valid(chrome));
     assert(rect_contains(item_rect(state), chrome));
     return {chrome};
@@ -264,7 +290,7 @@ auto decorate_button(Frame &frame, const Material &material, Widget &&widget)
         [&material](const detail::ItemState &state,
                     const std::optional<ip_rect> &captured, auto &canvas) {
             const detail::SingleAnatomy anatomy =
-                detail::single_anatomy(state, captured);
+                detail::single_anatomy(detail::Decorator::Button, state, captured);
             detail::paint_material(canvas, anatomy.chrome, material, state);
         });
 }
@@ -277,10 +303,40 @@ auto decorate_selectable(Frame &frame, const Material &material, bool selected,
         [&material, selected](const detail::ItemState &state,
                               const std::optional<ip_rect> &captured, auto &canvas) {
             const detail::SingleAnatomy anatomy =
-                detail::single_anatomy(state, captured);
+                detail::single_anatomy(detail::Decorator::Selectable, state, captured);
             detail::paint_material_color(
                 canvas, anatomy.chrome, material,
                 detail::selectable_fill(material, state, selected), state.style_alpha);
+        });
+}
+
+/* Decorates one Checkbox, painting only its box. The closure must submit
+ * exactly one Checkbox. */
+template <typename Widget>
+auto decorate_checkbox(Frame &frame, const Material &material, Widget &&widget)
+    -> decltype(widget()) {
+    return detail::item_paint(
+        frame, detail::Decorator::Checkbox, std::forward<Widget>(widget),
+        [&material](const detail::ItemState &state,
+                    const std::optional<ip_rect> &captured, auto &canvas) {
+            const detail::SingleAnatomy anatomy = detail::single_anatomy(
+                detail::Decorator::Checkbox, state, captured);
+            detail::paint_material(canvas, anatomy.chrome, material, state);
+        });
+}
+
+/* Decorates one single-line InputText, excluding its visible label. The
+ * closure must submit exactly one single-line InputText. */
+template <typename Widget>
+auto decorate_input_text(Frame &frame, const Material &material, Widget &&widget)
+    -> decltype(widget()) {
+    return detail::item_paint(
+        frame, detail::Decorator::InputText, std::forward<Widget>(widget),
+        [&material](const detail::ItemState &state,
+                    const std::optional<ip_rect> &captured, auto &canvas) {
+            const detail::SingleAnatomy anatomy = detail::single_anatomy(
+                detail::Decorator::InputText, state, captured);
+            detail::paint_material(canvas, anatomy.chrome, material, state);
         });
 }
 

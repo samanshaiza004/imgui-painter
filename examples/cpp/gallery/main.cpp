@@ -147,6 +147,22 @@ void draw_widget_decorators(ip::Frame &frame) {
         })) {
         second_selected = !second_selected;
     }
+
+    const ip::Material inset = ip::inset_control(palette);
+    static bool decorated_checkbox = true;
+    ip::decorate_checkbox(frame, inset, [&] {
+        return ImGui::Checkbox(
+            "Decorated checkbox with a long label outside the painted box",
+            &decorated_checkbox);
+    });
+
+    static char input_buffer[128] = "Editable stock ImGui text";
+    ip::decorate_input_text(frame, inset, [&] {
+        return ImGui::InputTextWithHint(
+            "Decorated InputText with a long label outside the painted frame",
+            "Type into the stock ImGui editor", input_buffer,
+            sizeof(input_buffer));
+    });
 }
 
 void draw_gallery(ip::Context &context, const demo::Backend &backend) {
