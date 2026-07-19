@@ -20,7 +20,10 @@ endif()
 # Examples fetch full Dear ImGui and GLFW checkouts, so keep the default
 # core-only build fast and usable offline. Opt in explicitly when needed.
 option(IMGUI_PAINTER_BUILD_EXAMPLES "Build imgui-painter examples" OFF)
-option(IMGUI_PAINTER_BUILD_TESTS "Build imgui-painter tests" ${PROJECT_IS_TOP_LEVEL})
+# Decorator regression tests require a real Dear ImGui checkout, so keep a
+# plain configure core-only and offline. A future core geometry test target
+# could safely default ON without that dependency.
+option(IMGUI_PAINTER_BUILD_TESTS "Build imgui-painter tests" OFF)
 
 set(IMGUI_PAINTER_SOURCES
     src/painter.cpp
@@ -70,6 +73,7 @@ install(TARGETS imgui_painter
 
 install(FILES
     include/imgui_painter.h
+    include/imgui_painter_decorators.h
     include/imgui_painter_imgui.h
     include/imgui_painter_recipes.h
     capi/imgui_painter_c.h
@@ -109,4 +113,9 @@ export(EXPORT imgui-painterTargets
 
 if(IMGUI_PAINTER_BUILD_EXAMPLES)
     add_subdirectory(examples/cpp)
+endif()
+
+if(IMGUI_PAINTER_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests/cpp)
 endif()

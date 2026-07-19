@@ -1,6 +1,7 @@
 #include "backend.h"
 
 #include "imgui.h"
+#include "imgui_painter_decorators.h"
 #include "imgui_painter_imgui.h"
 
 #include <array>
@@ -126,6 +127,28 @@ void draw_host_chrome() {
     ImGui::Button("Stock button");
 }
 
+void draw_widget_decorators(ip::Frame &frame) {
+    begin_section("Stock widget decorators");
+    ImGui::TextDisabled("Real ImGui widgets with imgui-painter chrome underneath their text.");
+
+    const ip::Material button = ip::raised_button(palette);
+    ip::decorate_button(frame, button, [] { return ImGui::Button("Decorated button"); });
+
+    static bool first_selected = true;
+    static bool second_selected = false;
+    const ip::Material row = ip::selected_row(palette);
+    if (ip::decorate_selectable(frame, row, first_selected, [&] {
+            return ImGui::Selectable("Persistently selected row", first_selected);
+        })) {
+        first_selected = !first_selected;
+    }
+    if (ip::decorate_selectable(frame, row, second_selected, [&] {
+            return ImGui::Selectable("Selectable row", second_selected);
+        })) {
+        second_selected = !second_selected;
+    }
+}
+
 void draw_gallery(ip::Context &context, const demo::Backend &backend) {
     const ImGuiViewport *viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos, ImGuiCond_Always);
@@ -135,13 +158,13 @@ void draw_gallery(ip::Context &context, const demo::Backend &backend) {
         ImGuiWindowFlags_NoSavedSettings;
 
     ImGui::Begin("imgui-painter gallery", nullptr, flags);
-    ImGui::TextUnformatted("imgui-painter C++ gallery — Phase 5 visual gate");
-    ImGui::TextDisabled("Each future decorator gets one section function and one call here.");
+    ImGui::TextUnformatted("imgui-painter C++ gallery — Phase 6 visual gate");
 
     auto frame = ip::begin_frame(context);
     draw_scale_status(backend);
     draw_panel_recipes(frame);
     draw_material_recipes(frame);
+    draw_widget_decorators(frame);
     draw_host_chrome();
     ImGui::End();
 }
