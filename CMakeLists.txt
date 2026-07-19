@@ -69,6 +69,7 @@ install(TARGETS imgui_painter
 install(FILES
     include/imgui_painter.h
     include/imgui_painter_imgui.h
+    include/imgui_painter_recipes.h
     capi/imgui_painter_c.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/imgui-painter
 )
