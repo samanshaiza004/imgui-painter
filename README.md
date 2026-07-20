@@ -80,8 +80,8 @@ linked, so there is never a second ImGui instance or an ABI-layout guess.
 `PrimReserve`/`PrimWriteVtx`/`PrimWriteIdx` generically, resolving against a real `ImDrawList`
 or against a duck-typed mock (there is a compile-check test that does exactly that).
 
-Writing through those public prim methods is deliberate. `ImDrawList`'s public *fields* are
-stable to read, but its *invariants* — write-pointer bookkeeping, texture and clip-rect
+Writing through those public prim methods is deliberate. `ImDrawList`'s public _fields_ are
+stable to read, but its _invariants_ — write-pointer bookkeeping, texture and clip-rect
 stacking, large-mesh vertex-offset handling — are maintained by methods like `PrimReserve`, are
 not covered by any ABI guarantee, and have changed across Dear ImGui versions.
 
@@ -114,12 +114,12 @@ Examples and tests are opt-in (`-DIMGUI_PAINTER_BUILD_EXAMPLES=ON`,
 
 Which header you include decides whether you take a Dear ImGui dependency at all:
 
-| Header | Adds | Includes `imgui.h`? |
-|---|---|---|
-| `imgui_painter.h` | painting core, fluent API, `Context`/`Frame`/`Canvas` | no |
-| `imgui_painter_recipes.h` | `Palette`, material builders, `panel`/`inset_panel` | no |
-| `imgui_painter_imgui.h` | automatic host-value sampling, `apply_imgui_colors` | yes |
-| `imgui_painter_decorators.h` | the seven widget decorators | yes |
+| Header                       | Adds                                                  | Includes `imgui.h`? |
+| ---------------------------- | ----------------------------------------------------- | ------------------- |
+| `imgui_painter.h`            | painting core, fluent API, `Context`/`Frame`/`Canvas` | no                  |
+| `imgui_painter_recipes.h`    | `Palette`, material builders, `panel`/`inset_panel`   | no                  |
+| `imgui_painter_imgui.h`      | automatic host-value sampling, `apply_imgui_colors`   | yes                 |
+| `imgui_painter_decorators.h` | the seven widget decorators                           | yes                 |
 
 The first two staying ImGui-free is load-bearing, not incidental: it is what lets `draw()` compile
 against any type exposing `PrimReserve`/`PrimWriteVtx`/`PrimWriteIdx`, which CI checks against a
@@ -127,10 +127,10 @@ mock draw list.
 
 Two host values drive correct output, and neither can be guessed safely:
 
-| Value | Where it comes from | Why it matters |
-|---|---|---|
-| `white_pixel_uv` | `ImGui::GetFontTexUvWhitePixel()` | Flat and gradient fills sample your atlas's solid-white texel. A wrong UV samples the wrong texel with no visible error. |
-| `pixel_scale` | `ImGui::GetIO().DisplayFramebufferScale.x` | Sub-pixel hairlines are drawn at one device pixel with proportionally reduced alpha. Skipping it blurs bevels on HiDPI. |
+| Value            | Where it comes from                        | Why it matters                                                                                                           |
+| ---------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `white_pixel_uv` | `ImGui::GetFontTexUvWhitePixel()`          | Flat and gradient fills sample your atlas's solid-white texel. A wrong UV samples the wrong texel with no visible error. |
+| `pixel_scale`    | `ImGui::GetIO().DisplayFramebufferScale.x` | Sub-pixel hairlines are drawn at one device pixel with proportionally reduced alpha. Skipping it blurs bevels on HiDPI.  |
 
 `imgui_painter_imgui.h` samples both for you, once per frame:
 
@@ -146,7 +146,7 @@ submits once when it goes out of scope. `ip::Painter` remains available as the s
 convenience path for one-off shapes — it creates and destroys one native context per instance, so
 prefer `Context` when painting more than a couple of elements per frame.
 
-`ip_begin` resets the pixel scale to `1.0`, so set it *after* beginning a session — the fluent
+`ip_begin` resets the pixel scale to `1.0`, so set it _after_ beginning a session — the fluent
 `.pixel_scale()` call above is already in the right place.
 
 ### Plain C
@@ -174,17 +174,17 @@ The mesh buffers are owned by the `ip_ctx` and stay valid until the next `ip_beg
 
 Being precise about this matters more than making the library sound finished.
 
-| | C++ | Rust |
-|---|---|---|
-| Painting core (shapes, gradients, shadows, borders, bands, lines) | ✅ | ✅ |
-| Fluent chaining API | ✅ | ✅ |
-| Build system | ✅ CMake | ✅ Cargo |
-| Reusable per-frame context | ✅ `Context` → `Frame` → `Canvas` | ✅ `Painter` → `Frame` → `Canvas` |
-| Host values sampled automatically | ✅ | ✅ |
-| **Widget decoration** (restyle a stock `ImGui::Button`) | ✅ all seven widgets | ✅ all seven widgets |
-| Palette / recipes | ✅ | ✅ |
-| Examples and visual demo | ✅ GLFW + OpenGL3 | ✅ wgpu + winit |
-| Tests | ✅ native, plus via the Rust binding | ✅ |
+|                                                                   | C++                                  | Rust                              |
+| ----------------------------------------------------------------- | ------------------------------------ | --------------------------------- |
+| Painting core (shapes, gradients, shadows, borders, bands, lines) | ✅                                   | ✅                                |
+| Fluent chaining API                                               | ✅                                   | ✅                                |
+| Build system                                                      | ✅ CMake                             | ✅ Cargo                          |
+| Reusable per-frame context                                        | ✅ `Context` → `Frame` → `Canvas`    | ✅ `Painter` → `Frame` → `Canvas` |
+| Host values sampled automatically                                 | ✅                                   | ✅                                |
+| **Widget decoration** (restyle a stock `ImGui::Button`)           | ✅ all seven widgets                 | ✅ all seven widgets              |
+| Palette / recipes                                                 | ✅                                   | ✅                                |
+| Examples and visual demo                                          | ✅ GLFW + OpenGL3                    | ✅ wgpu + winit                   |
+| Tests                                                             | ✅ native, plus via the Rust binding | ✅                                |
 
 Widget decoration covers Button, Selectable, Checkbox, InputText, Slider, Combo, and TreeNode in
 both bindings.
