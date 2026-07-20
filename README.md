@@ -63,9 +63,11 @@ imgui-painter core     (C++17; ZERO Dear ImGui / cimgui dependency — pure
                         math in, a generic vertex/index mesh out)
         ↑ C API (capi/imgui_painter_c.h)
    ┌────┴──────────────────────────┐
-include/imgui_painter.h        bindings/rust
-(header-only C++ fluent         (Rust adapter; also hosts the widget
- wrapper, ImGui-free)            decoration layer)
+include/*.h                    bindings/rust
+(header-only C++: ImGui-free    (Rust adapter, recipes, and the
+ core + fluent API, plus         widget decoration layer)
+ opt-in recipes, host-value
+ sampling, and decorators)
         ↑                               ↑
    host app (C++)                  host app (Rust)
 ```
@@ -91,7 +93,7 @@ The library builds with CMake (3.16+, C++17). Consume it with `FetchContent`:
 include(FetchContent)
 FetchContent_Declare(imgui-painter
     GIT_REPOSITORY https://github.com/samanshaiza004/imgui-painter.git
-    GIT_TAG        main   # pin to a tag once 0.1.0 is released
+    GIT_TAG        v0.1.0
 )
 FetchContent_MakeAvailable(imgui-painter)
 target_link_libraries(your_app PRIVATE imgui_painter::imgui_painter)

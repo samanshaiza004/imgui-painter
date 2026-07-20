@@ -1,7 +1,7 @@
 # Getting started
 
-This page covers C++. For the Rust binding — which is where widget decoration currently
-lives — see [the Rust overview](rust/index.md).
+This page covers C++. For the Rust binding, see [the Rust overview](rust/index.md); both
+bindings expose the same feature set.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ The library builds with CMake (3.16+). Fetch it:
 include(FetchContent)
 FetchContent_Declare(imgui-painter
     GIT_REPOSITORY https://github.com/samanshaiza004/imgui-painter.git
-    GIT_TAG        main   # pin to a tag once 0.1.0 is released
+    GIT_TAG        v0.1.0
 )
 FetchContent_MakeAvailable(imgui-painter)
 target_link_libraries(your_app PRIVATE imgui_painter::imgui_painter)
@@ -141,11 +141,14 @@ pins to an exact version with a `static_assert`. See
 [the compatibility contract](decorators/contract.md) and
 [widget anatomy](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/widget-anatomy.md).
 
-In the meantime, painting panels, strips, wells, and backgrounds behind stock widgets works
-today — paint the surface first, then submit the widgets that sit on it.
+Painting panels, strips, wells, and backgrounds behind stock widgets works the same way — paint
+the surface first, then submit the widgets that sit on it.
 
 ## Performance note
 
-`ip::Painter` creates and destroys one native context per instance, so a frame with many
-painted elements creates many. That is fine at panel-and-strip scale and wasteful per-row in a
-long list. A reusable per-frame context is the second item on the parity plan.
+`ip::Painter` creates and destroys one native context per instance, so a frame with many painted
+elements creates many. That is fine at panel-and-strip scale and wasteful per-row in a long list.
+
+Use `ip::Context` instead when painting more than a couple of elements per frame: it owns one
+native context, hands out a `Frame` per frame and a `Canvas` per draw list, and a `Canvas`
+accumulates every shape drawn on it and submits once when it goes out of scope.

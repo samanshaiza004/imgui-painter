@@ -1,14 +1,14 @@
 # Changelog
 
 All notable changes to this project are documented here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project does not
-yet follow semantic versioning, because it has not had a release.
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and, from 0.1.0 onward,
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 Nothing yet.
 
-## [0.1.0] — unreleased
+## [0.1.0] — 2026-07-19
 
 The initial development line, built in phases. Each phase closed against a
 human visual gate (`painter_demo` at 1×/1.5×/2×) in addition to automated tests;
@@ -74,12 +74,72 @@ hover, and active queries all survive the bracket. This is tested as a public
 compatibility contract so tooltips, context menus, and drag/drop can be attached
 immediately after a decorated call.
 
+### Bringing C++ to parity
+
+The phases above were built through the Rust binding, which got ahead by accident
+of history: it was the first consumer and the layer that proved the design. Dear
+ImGui's own audience is overwhelmingly C++, and the C ABI exists precisely so every
+binding can sit on equal footing. This line closes that gap — the C++ side now has
+everything the Rust binding does.
+
+- **Build system.** A root `CMakeLists.txt` exporting `imgui_painter::imgui_painter`
+  (C++17), consumable by `find_package` or `FetchContent`. Before this there was no
+  build definition at all outside the Rust crate's `build.rs`; a C++ user had to
+  hand-roll a compile. The default build stays core-only, offline, and about two
+  seconds — examples and Dear ImGui tests are explicit opt-ins.
+- **Reusable per-frame context.** `ip::Context` → `ip::Frame` → `ip::Canvas` mirrors
+  the Rust chain, so one native context is reused across a frame instead of created
+  and destroyed per shape. `ip::Painter` remains as the single-use convenience path.
+  C++ has no borrow checker, so overlapping frames and canvases are caught by a
+  debug assert rather than a compile error.
+- **Automatic host-value sampling.** The opt-in `imgui_painter_imgui.h` samples
+  `GetFontTexUvWhitePixel()` and `DisplayFramebufferScale.x`. Both fail silently when
+  supplied wrongly — a wrong texel, blurred hairlines — which is why they are now
+  sampled rather than passed by hand.
+- **Palette and recipes.** `imgui_painter_recipes.h` carries the 9-token `Palette`,
+  the colour maths, and the material builders, all ImGui-free; `apply_imgui_colors`
+  maps a palette across all 56 stock colour roles.
+- **Widget decoration** — the feature the library leads with, restyling a *stock*
+  `ImGui::Button()` with no wrapper widget. All seven widgets: Button, Selectable,
+  Checkbox, InputText, Slider, Combo, TreeNode. The last-item preservation contract
+  and its regression test came across with it.
+- **Examples.** GLFW + OpenGL3 `basic` and `gallery` binaries, the latter carrying
+  the same `IMGUI_PAINTER_DEMO_UI_SCALE` semantics as the Rust demo so the
+  1×/1.5×/2× visual gate can run on the C++ rendering path.
+- **Native tests.** 40 core geometry tests plus 15 decorator tests, driving the C ABI
+  directly. `cmake -B build && ctest` verifies the core with no Dear ImGui and no
+  network, so a C++-only contributor can finally check their own change to
+  `src/painter.cpp`.
+
+The two decorator implementations cannot share code — the geometry formulas read Dear
+ImGui's own layout state, which lives on whichever side of the FFI boundary owns the
+context. [docs/widget-anatomy.md](docs/widget-anatomy.md) is the single spec both
+implement, and records why the non-obvious choices are deliberate rather than bugs.
+
+### Fixed
+
+- The `decorators` Cargo feature that `CONTRIBUTING.md` described as "executable proof
+  that the painter core stays independent of any particular Dear ImGui version" did
+  not exist. `--no-default-features` compiled an identical code path, and CI never ran
+  it. The feature now exists and gates the version-coupled code; CI runs it.
+- `cmake/FindOrFetchImGui.cmake` pinned the docking branch, while the Rust binding
+  compiles the non-docking tree (no `docking` feature is enabled anywhere). Same
+  version number, different `ImGuiCol_` count. Repointed to plain `v1.91.9b`.
+- A broken documentation anchor in the decorator compatibility chapter, live on the
+  published site since the getting-started page was reframed around C++.
+
 ### Compatibility
 
 Reconstructed widget geometry is explicitly compatible with **Dear ImGui 1.91.9b**
 via imgui-rs 0.12 fork revision `7a89260`. Migrated from 1.89.2 to 1.91.9b, which
 also brought upstream multi-select. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
 dependency-bump checklist that guards this.
+
+The C++ decorator header pins harder than the Rust binding does, deliberately. Rust
+checks the version with a `debug_assert` that compiles out in release, so a mismatch
+there degrades to silently wrong geometry; C++ uses `static_assert(IMGUI_VERSION_NUM
+== 19191)` with `IMGUI_PAINTER_ALLOW_UNVERIFIED_IMGUI` as a named opt-out for anyone
+who has rerun the visual gate themselves.
 
 ### Still deferred
 
