@@ -93,7 +93,7 @@ The library builds with CMake (3.16+, C++17). Consume it with `FetchContent`:
 include(FetchContent)
 FetchContent_Declare(imgui-painter
     GIT_REPOSITORY https://github.com/samanshaiza004/imgui-painter.git
-    GIT_TAG        v0.1.0
+    GIT_TAG        v0.1.1
 )
 FetchContent_MakeAvailable(imgui-painter)
 target_link_libraries(your_app PRIVATE imgui_painter::imgui_painter)

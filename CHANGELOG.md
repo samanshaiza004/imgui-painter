@@ -8,6 +8,22 @@ All notable changes to this project are documented here. The format follows
 
 Nothing yet.
 
+## [0.1.1] — 2026-07-20
+
+### Fixed
+
+- The native geometry tests failed to compile under MSVC. Four lambdas read a
+  `const ip_color` from the enclosing scope without capturing it. Because the
+  initializer is `constexpr`, that read is not an odr-use, so no capture is
+  required and Clang and GCC accept it — MSVC rejects it with C3493 anyway.
+  The constants are now `static constexpr`, which needs no capture on any
+  compiler; adding an explicit capture instead would have fixed MSVC at the
+  cost of four `-Wunused-lambda-capture` warnings on Clang.
+
+  Only the C++ Windows job was affected; Linux and macOS passed. This was the
+  first run of the C++ CI job added in 0.1.0, and it caught a genuine
+  portability gap on a platform that had never been exercised.
+
 ## [0.1.0] — 2026-07-19
 
 The initial development line, built in phases. Each phase closed against a

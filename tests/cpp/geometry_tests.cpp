@@ -171,7 +171,7 @@ IP_TEST_CASE(radius_zero_never_produces_nan_positions,
 
 IP_TEST_CASE(solid_fill_produces_a_closed_triangle_fan,
              "solid_fill_produces_a_closed_triangle_fan") {
-    const ip_color color = rgba(255,255,255);
+    static constexpr ip_color color = rgba(255,255,255);
     Session s; s.begin(); s.rounded_rect(rect(0,0,100,50), 8); s.fill_color(color);
     const Mesh mesh = s.end();
     require(!mesh.vertices.empty(), "solid fill is empty");
@@ -237,7 +237,7 @@ IP_TEST_CASE(linear_gradient_endpoints_hit_exact_stop_colors,
 }
 
 void require_degenerate_gradient(ip_gradient_mode mode) {
-    const ip_color first=rgba(0xAA,0xAA,0xAA,0xAA);
+    static constexpr ip_color first=rgba(0xAA,0xAA,0xAA,0xAA);
     const ip_color_stop stops[]={{0,first},{1,rgba(0xBB,0xBB,0xBB,0xBB)}};
     const ip_gradient gradient{mode,{20,20},{20,20},stops,2};
     Session s; s.begin(); s.rounded_rect(rect(0,0,40,40),4); s.fill_gradient(gradient);
@@ -313,7 +313,7 @@ IP_TEST_CASE(empty_stops_is_a_no_op, "empty_stops_is_a_no_op") {
 }
 
 IP_TEST_CASE(single_stop_gradient_fills_solid, "single_stop_gradient_fills_solid") {
-    const ip_color color=rgba(0x42,0x42,0x42,0x42); const ip_color_stop stop{0,color};
+    static constexpr ip_color color=rgba(0x42,0x42,0x42,0x42); const ip_color_stop stop{0,color};
     const ip_gradient gradient{IP_GRADIENT_RADIAL,{5,5},{5,5},&stop,1};
     Session s; s.begin(); s.rounded_rect(rect(0,0,10,10),0); s.fill_gradient(gradient);
     const Mesh mesh=s.end(); require(!mesh.vertices.empty(),"single stop emitted no output");
@@ -485,7 +485,7 @@ IP_TEST_CASE(no_shape_means_no_shadow_or_border_output,
 
 IP_TEST_CASE(line_produces_a_one_pixel_wide_quad_with_the_expected_span,
              "line_produces_a_one_pixel_wide_quad_with_the_expected_span") {
-    const ip_color color=rgba(255,0,0);Session s;s.begin();s.line({10,5},{10,25},1,color);const Mesh mesh=s.end();
+    static constexpr ip_color color=rgba(255,0,0);Session s;s.begin();s.line({10,5},{10,25},1,color);const Mesh mesh=s.end();
     require(mesh.vertices.size()==4,"line is not one quad");require(mesh.indices.size()==6,"line is not two triangles");
     require(all_vertices(mesh,[](const ip_vertex &v){return (v.pos.x==9.5f||v.pos.x==10.5f)&&(v.pos.y==5||v.pos.y==25)&&v.col==color;}),"line span, width, or color is wrong");
 }
