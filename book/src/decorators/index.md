@@ -9,6 +9,12 @@
 A decorator restyles a **stock** ImGui widget. There is no wrapper widget, no
 reimplementation, and no fork of ImGui's logic.
 
+```cpp
+bool clicked = ip::decorate_button(frame, material, [] {
+    return ImGui::Button("Save");
+});
+```
+
 ```rust
 unsafe {
     decorate_button(&mut frame, &material, || ui.button("Save"));
@@ -17,6 +23,10 @@ unsafe {
 
 That is a real `ImGui::Button()`. It keeps its ID, layout, input handling,
 keyboard navigation, disabled state, and return value.
+
+The remaining examples in these chapters are written in Rust for brevity. The
+C++ API mirrors them one-to-one — same names, same argument order, with the
+widget passed as a lambda instead of a closure and the `unsafe` block dropped.
 
 ## The bracket
 

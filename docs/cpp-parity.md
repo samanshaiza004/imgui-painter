@@ -1,17 +1,21 @@
-# C++ parity plan
+# C++ parity design record
 
-What the C++ side needed in order to match what the Rust binding does.
+> **This work is complete.** Shipped in 0.1.0; C++ and Rust are at feature parity. This is a
+> historical design record, not a roadmap — nothing below is outstanding.
+>
+> All seven items landed: the CMake build, the reusable per-frame context, automatic host-value
+> sampling, palette and recipes, GLFW + OpenGL3 examples, all seven widget decorators, and native
+> C++ tests (40 geometry + 15 decorator, under CTest).
+>
+> Two things outlived the plan and are the live documents to read instead:
+> [widget-anatomy.md](widget-anatomy.md), the chrome-geometry spec both bindings implement, and
+> the [CHANGELOG](../CHANGELOG.md) entry for 0.1.0. The one open question below — whether C++ or
+> Rust is the reference binding going forward — was not settled by this work.
+>
+> The filename stays put because the 0.1.0 release notes and the book both link to it.
 
-> **Status: items 1-6 are done.** CMake build, reusable per-frame context, automatic host-value
-> sampling, palette/recipes, GLFW + OpenGL3 examples, and all seven widget decorators have
-> landed. Item 7 (native C++ tests) is partially done — decorator behaviour and widget anatomy
-> have native coverage; the core geometry suite still runs only through the Rust harness.
->
-> The anatomy formulas the decorator work reconstructed are now written down once, in
-> [widget-anatomy.md](widget-anatomy.md), which both bindings implement. The remaining
-> open decision below — whether C++ or Rust is the reference binding — is still open.
->
-> This document is kept as the record of what the gap was and why each choice was made.
+It is kept because the reasoning is worth preserving: what the gap actually was, and why each
+choice was made the way it was.
 
 This exists because the Rust binding got ahead by accident of history — it was the first
 consumer and the layer that proved the design — while Dear ImGui's own audience is

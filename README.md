@@ -1,33 +1,86 @@
 # imgui-painter
 
-A rendering and styling toolkit for [Dear ImGui](https://github.com/ocornut/imgui), written
-in C++. It makes high-quality visuals as easy as `PushStyleColor`, without replacing ImGui's
-widget, layout, or input systems.
+A rendering and styling toolkit for [Dear ImGui](https://github.com/ocornut/imgui), in C++ and
+Rust — high-quality visuals without replacing ImGui's widget, layout, or input systems.
+
+## Restyle a stock widget
+
+The headline feature: that is a real `ImGui::Button()`. It keeps its ID, layout, input handling,
+keyboard navigation, and return value. imgui-painter suppresses only the `ImGuiCol_` roles it
+replaces and paints its own chrome underneath.
 
 ```cpp
-#include "imgui_painter.h"
+#include "imgui_painter_decorators.h"
 
-const ImVec2 uv = ImGui::GetFontTexUvWhitePixel();
-const ip_rect rect = {{p.x, p.y}, {p.x + 200.0f, p.y + 32.0f}};
+ip::Context ctx;                                   // long-lived, owns one native context
+const ip::Material material = ip::raised_button(palette);
 
-ip::Painter({uv.x, uv.y}, rect, 5.0f)
-    .pixel_scale(ImGui::GetIO().DisplayFramebufferScale.x)
-    .shadow(drop_shadow)     // painted first, so it sits behind
-    .fill(surface_gradient)
-    .border(outline)
-    .draw(*ImGui::GetWindowDrawList());
+// ...per frame:
+auto frame = ip::begin_frame(ctx);
+
+bool clicked = ip::decorate_button(frame, material, [] {
+    return ImGui::Button("Save");
+});
 ```
 
-Shadows, multi-stop gradients, gloss bands, bevel hairlines, and stacked borders compose in
-call order — no styling language, no cascade, no selectors.
+No wrapper widget, no reimplementation, no fork of ImGui's logic. The same shape covers all seven
+supported widgets: Button, Selectable, Checkbox, InputText, Slider, Combo, and TreeNode.
 
-**What it is not:** a design system, a widget-set replacement, Qt, or CSS. It is closer to a
-2D rendering framework specialized for Dear ImGui than to "a styling helper."
+## Paint your own surfaces
 
-> **Status: pre-release.** C++ and Rust are now at feature parity — CMake build, reusable
-> per-frame context, automatic host-value sampling, all seven widget decorators, palette and
-> recipes, and GLFW + OpenGL3 examples. See [Project status](#project-status), which is
-> deliberately specific about what does and does not exist.
+```cpp
+ip::Context ctx;                          // long-lived
+auto frame  = ip::begin_frame(ctx);       // samples the host values for you
+auto canvas = ip::window_canvas(frame);   // targets the current window's draw list
+
+canvas.rounded_rect(rect, 6.0f)
+    .shadow(drop)                         // painted first, so it sits behind
+    .fill(surface_gradient)
+    .band(top, top + hairline, highlight) // one-device-pixel bevel
+    .border({1.0f, outline});
+```
+
+Shadows, multi-stop gradients, gloss bands, bevel hairlines, and stacked borders compose in call
+order — no styling language, no cascade, no selectors. A `Canvas` accumulates everything drawn on
+it and submits once when it goes out of scope.
+
+## Install
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(imgui-painter
+    GIT_REPOSITORY https://github.com/samanshaiza004/imgui-painter.git
+    GIT_TAG        v0.1.1
+)
+FetchContent_MakeAvailable(imgui-painter)
+target_link_libraries(your_app PRIVATE imgui_painter::imgui_painter)
+```
+
+Or install and `find_package(imgui-painter REQUIRED)` against the same target. CMake 3.16+, C++17.
+Rust users: see [the Rust binding](bindings/rust).
+
+## What you get
+
+- **Seven widget decorators** that restyle stock ImGui widgets in place, preserving the last-item
+  contract so tooltips, context menus, and drag/drop still attach normally.
+- **A painting core with zero Dear ImGui dependency** — pure math in, a vertex/index mesh out. It
+  rides whatever ImGui build you already linked, so there is never a second ImGui instance.
+- **Shadows, four gradient modes, bands, and stacked borders** composing in explicit call order.
+- **HiDPI-correct hairlines** — sub-pixel borders draw at one device pixel with proportionally
+  reduced alpha instead of blurring.
+- **A 9-token palette and recipe family** that also maps across all 56 stock ImGui colour roles.
+- **C++ and Rust at parity**, both on the same C ABI.
+
+> **Status: early release (v0.1.1).** The API is pre-1.0 and may still evolve. C++ and Rust are at
+> feature parity; see [Project status](#project-status) for the specifics.
+
+## Compatibility, in one paragraph
+
+The painting core is independent of any particular Dear ImGui version. **The decorators are not** —
+they reconstruct stock widget chrome geometry, which is internal ImGui detail upstream may change
+in any release. They target Dear ImGui **1.91.9b**. The C++ header enforces this with a
+`static_assert`; a mismatched version fails to compile rather than silently painting in the wrong
+place. See [Compatibility](#compatibility) for the full story.
 
 ## Why
 
@@ -202,20 +255,32 @@ is the single spec both implement, so they cannot drift silently.
 
 The painting core is independent of any particular Dear ImGui version.
 
-The **decorators** (Rust-only today) are not: they reconstruct stock widget chrome geometry,
+The **decorators**, in both bindings, are not: they reconstruct stock widget chrome geometry,
 which is internal Dear ImGui detail that upstream is entitled to change in any release. They
-target Dear ImGui **1.91.9b** via imgui-rs 0.12 fork rev
+target Dear ImGui **1.91.9b** — in Rust via imgui-rs 0.12 fork rev
 [`7a89260`](https://github.com/samanshaiza004/imgui-rs). A source-compatible ImGui bump can
-compile cleanly while silently moving the widget away from the painted rectangle, so
-[`VERIFIED_IMGUI_SYS`](VERIFIED_IMGUI_SYS) records the revision a human last visually verified
-and CI fails when the resolved revision drifts from it. See the
+compile cleanly while silently moving the widget away from the painted rectangle, so each side
+guards it differently:
+
+| | Guard | On a mismatch |
+|---|---|---|
+| C++ | `static_assert(IMGUI_VERSION_NUM == 19191)` | fails to compile, in every build mode |
+| Rust | `debug_assert` on `igGetVersion()` | panics in debug; **compiled out in release** |
+
+The C++ side pins harder on purpose, and offers `IMGUI_PAINTER_ALLOW_UNVERIFIED_IMGUI` as a named
+opt-out for anyone who has rerun the visual gate themselves. On the Rust side,
+[`VERIFIED_IMGUI_SYS`](VERIFIED_IMGUI_SYS) records the revision a human last visually verified and
+CI fails when the resolved revision drifts from it. See the
 [dependency-bump checklist](CONTRIBUTING.md#dependency-bump-checklist).
 
 ## Documentation
 
 - **[The book](https://samanshaiza004.github.io/imgui-painter/)** — concepts, the C ABI,
   decorator anatomy, and recipes.
-- **[C++ parity plan](docs/cpp-parity.md)** — what C++ needs to match the Rust binding.
+- **[Widget anatomy](docs/widget-anatomy.md)** — the chrome-geometry spec both decorator
+  implementations follow, and why the non-obvious choices are deliberate.
+- **[C++ parity design record](docs/cpp-parity.md)** — how the C++ side reached parity, kept as
+  the record of what the gap was and why each choice was made.
 - **[API reference](https://samanshaiza004.github.io/imgui-painter/api/imgui_painter/)** —
   rustdoc for the Rust binding.
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — quality bar, visual gate, dependency-bump checklist.
@@ -224,23 +289,40 @@ and CI fails when the resolved revision drifts from it. See the
 ## Repo layout
 
 ```
-include/imgui_painter.h   header-only C++ fluent wrapper over capi/
-capi/imgui_painter_c.h    the C ABI — every language binding compiles against this
-src/painter.cpp           the core: tessellation, gradients, shadows, borders
-bindings/rust/            the Rust binding (+ the widget decoration layer)
-book/                     prose documentation (mdBook)
-docs/                     design findings, parity plan, case studies, screenshots
+capi/imgui_painter_c.h            the C ABI — every language binding compiles against this
+src/painter.cpp                   the core: tessellation, gradients, shadows, borders
+
+include/imgui_painter.h           fluent API + Context/Frame/Canvas   (no imgui.h)
+include/imgui_painter_recipes.h   Palette, materials, panel painters  (no imgui.h)
+include/imgui_painter_imgui.h     host-value sampling, apply_imgui_colors
+include/imgui_painter_decorators.h  the seven widget decorators
+
+cmake/                            FindOrFetchImGui/GLFW, package config template
+tests/cpp/                        native geometry + decorator tests (CTest)
+examples/cpp/                     GLFW + OpenGL3 basic and gallery demos
+bindings/rust/                    the Rust binding, its examples and benches
+book/                             prose documentation (mdBook)
+docs/                             widget-anatomy spec, design records, screenshots
 ```
 
 ## Testing
 
-The core's tests currently run through the Rust binding (`cargo test`), which also
-compile-checks `include/imgui_painter.h` against a mock draw list to catch header rot. A native
-C++ test target is part of the [parity plan](docs/cpp-parity.md).
+Native C++ tests run under CTest. The core suite drives the C ABI directly and needs no Dear
+ImGui and no network, so it runs on a plain default build:
 
-Automated tests cover mesh geometry, lifecycle cleanup, composition invariants, and a
-zero-allocation steady state — not final rasterized appearance, which is what the human visual
-gate in [CONTRIBUTING.md](CONTRIBUTING.md#the-visual-gate) is for.
+```sh
+cmake -B build && cmake --build build && ctest --test-dir build
+```
+
+That is 40 geometry tests. The 15 decorator tests need a real Dear ImGui and are an explicit
+opt-in (`-DIMGUI_PAINTER_BUILD_IMGUI_TESTS=ON`), bringing the total to 55.
+
+The Rust binding carries its own 67 tests over the same core, plus a zero-allocation steady-state
+check and a compile-check of the ImGui-free headers against a mock draw list. Testing one core
+through two bindings is deliberate — it is the property worth protecting.
+
+None of it covers final rasterized appearance, which is what the human visual gate in
+[CONTRIBUTING.md](CONTRIBUTING.md#the-visual-gate) is for.
 
 ## License
 

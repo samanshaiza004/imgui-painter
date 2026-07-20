@@ -88,9 +88,9 @@ Two-phase template lookup is what makes this work: the argument types of `dl.Pri
 aren't checked until `DrawList` is concrete at the call site, so the brace-initialized vertex
 and UV arguments construct whichever vec2 type that draw list's real method expects.
 
-`ip::Painter` owns one `ip_ctx` and is single-use — one instance per shape. See the
-[parity plan](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md)
-for the reusable per-frame context that will replace it on hot paths.
+`ip::Painter` owns one `ip_ctx` and is single-use — one instance per shape. For hot paths, use
+`ip::Context` instead: it owns one context for the whole frame and hands out a `Frame` per frame
+and a `Canvas` per draw list. See [Getting started](getting-started.md#adding-it-to-your-build).
 
 ## Writing a new binding
 

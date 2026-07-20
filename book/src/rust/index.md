@@ -1,15 +1,13 @@
 # The Rust binding
 
-`bindings/rust` is imgui-painter's most complete binding today. Alongside the painting core it
-carries two layers that do not exist in C++ yet:
+`bindings/rust` carries the painting core plus widget decoration and the recipe/palette layer —
+the same feature set as the C++ side. Both sit on the same C ABI.
 
-- **Widget decoration** — restyling a stock `ImGui::Button`, `Checkbox`, `Slider`, and friends.
-- **Recipes and palettes** — turning a handful of color tokens into materials and painted
-  surfaces.
-
-That is a historical accident rather than a design preference: Rust was the first consumer and
-the layer that proved the design. What C++ needs to catch up is written up in the
-[parity plan](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/cpp-parity.md).
+Rust was the first consumer and the layer that proved the design, so it got there first; C++
+reached parity in 0.1.0. Where the two differ is documented rather than incidental: the decorator
+geometry formulas cannot be shared across the FFI boundary, so both implement one written spec
+([widget anatomy](https://github.com/samanshaiza004/imgui-painter/blob/main/docs/widget-anatomy.md)),
+and the Rust version pin is a `debug_assert` where the C++ one is a `static_assert`.
 
 ## Setup
 

@@ -72,13 +72,19 @@ library is pinned to one ImGui release.
 | Layer | Depends on ImGui version? |
 |---|---|
 | C++ core (`src/painter.cpp`) | No — no ImGui dependency at all |
-| C++ fluent header (`include/imgui_painter.h`) | No — uses public `PrimReserve`/`PrimWrite*` methods |
+| C++ fluent header (`imgui_painter.h`) | No — uses public `PrimReserve`/`PrimWrite*` methods |
+| C++ recipes (`imgui_painter_recipes.h`) | No — plain data and colour arithmetic |
 | Rust adapter (`adapter.rs`) | No — `PrimReserve`/`PrimWrite*` are stable |
 | Rust style data types (`Material`, `StateColors`, …) | No — plain data |
 | Rust recipe builders (`raised_button`, `panel`, …) | No |
-| Rust `decorate_*` | **Yes** — reconstructs widget chrome geometry |
-| Rust `recipes::apply_imgui_colors` | **Yes** — names newer color roles |
+| `decorate_*` (both bindings) | **Yes** — reconstructs widget chrome geometry |
+| `apply_imgui_colors` (both bindings) | **Yes** — names newer colour roles |
 
-Only the last two rows are pinned, and both are Rust-only today. The core and
-C++ fluent header have no Dear ImGui version coupling. See
-[The compatibility contract](../decorators/contract.md).
+Only the last two rows are pinned, and they are pinned in **both** bindings. The
+cores, the C++ fluent header, and the C++ recipes have no Dear ImGui version
+coupling — which is why the ImGui-free headers are kept separate from the two
+that include `imgui.h`.
+
+The two bindings enforce the pin differently: C++ uses a compile-time
+`static_assert` on `IMGUI_VERSION_NUM`, Rust a `debug_assert` that compiles out
+in release. See [The compatibility contract](../decorators/contract.md).
