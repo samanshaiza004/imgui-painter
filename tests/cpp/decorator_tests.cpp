@@ -1,6 +1,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imgui_painter_decorators.h"
+#include "test_harness.h"
 
 #include <cmath>
 #include <exception>
@@ -21,11 +22,7 @@ const ip::Material material{
     std::nullopt,
 };
 
-void require(bool condition, const char *message) {
-    if (!condition) {
-        throw std::runtime_error(message);
-    }
-}
+using ip_test::require;
 
 void initialize_context() {
     ImGui::CreateContext();
@@ -62,7 +59,7 @@ void require_same_colors(ip::detail::Decorator decorator,
     }
 }
 
-void decorators_suppress_expected_color_families() {
+IP_TEST_CASE(decorators_suppress_expected_color_families, "suppression") {
     constexpr ImGuiCol button[] = {
         ImGuiCol_Button, ImGuiCol_ButtonHovered, ImGuiCol_ButtonActive};
     constexpr ImGuiCol header[] = {
@@ -99,7 +96,7 @@ bool same_rect(ip_rect a, ip_rect b) {
 
 float center_x(ip_rect rect) { return (rect.min.x + rect.max.x) * 0.5f; }
 
-void combo_anatomy_partitions_without_gap_or_overlap() {
+IP_TEST_CASE(combo_anatomy_partitions_without_gap_or_overlap, "combo-anatomy") {
     const ip_rect frame{{2.0f, 3.0f}, {102.0f, 23.0f}};
     const ip::detail::ComboAnatomy anatomy =
         ip::detail::combo_anatomy(frame);
@@ -123,7 +120,7 @@ void combo_anatomy_partitions_without_gap_or_overlap() {
             "Narrow Combo arrow escaped the frame");
 }
 
-void tree_anatomy_handles_leaf_and_clamps_disclosure() {
+IP_TEST_CASE(tree_anatomy_handles_leaf_and_clamps_disclosure, "tree-anatomy") {
     const ip_rect row{{10.0f, 20.0f}, {110.0f, 40.0f}};
     const ip::detail::TreeAnatomy leaf =
         ip::detail::tree_anatomy(row, true, 18.0f);
@@ -145,7 +142,7 @@ void tree_anatomy_handles_leaf_and_clamps_disclosure() {
             "Clamped TreeNode disclosure escaped the row");
 }
 
-void combo_visual_states_map_to_material_slots() {
+IP_TEST_CASE(combo_visual_states_map_to_material_slots, "combo-slot-mapping") {
     using ip::detail::ComboVisualState;
     using ip::detail::StateColorSlot;
     require(ip::detail::combo_state_color_slot(ComboVisualState::Idle) ==
@@ -165,7 +162,7 @@ void combo_visual_states_map_to_material_slots() {
             "Open Combo state did not map to Active");
 }
 
-void tree_visual_states_map_to_material_slots() {
+IP_TEST_CASE(tree_visual_states_map_to_material_slots, "tree-slot-mapping") {
     using ip::detail::StateColorSlot;
     using ip::detail::TreeVisualState;
     require(ip::detail::tree_state_color_slot(TreeVisualState::Idle) ==
@@ -188,7 +185,7 @@ void tree_visual_states_map_to_material_slots() {
             "Pressed Tree state did not map to Active");
 }
 
-void slider_grab_padding_ignores_framebuffer_scale() {
+IP_TEST_CASE(slider_grab_padding_ignores_framebuffer_scale, "slider-grab-padding") {
     const ip_rect frame{{0.0f, 0.0f}, {100.0f, 20.0f}};
     const ip_rect at_one =
         ip::detail::slider_anatomy(frame, 0.0f, 1.0f, 0.0f, 10.0f, 1.0f).grab;
@@ -202,7 +199,7 @@ void slider_grab_padding_ignores_framebuffer_scale() {
             "Slider grab changed at framebuffer scale 2.0");
 }
 
-void slider_track_minimum_uses_framebuffer_scale_only() {
+IP_TEST_CASE(slider_track_minimum_uses_framebuffer_scale_only, "slider-track-minimum") {
     const ip_rect frame{{0.0f, 0.0f}, {100.0f, 4.0f}};
     const ip_rect at_one =
         ip::detail::slider_anatomy(frame, 0.0f, 1.0f, 0.5f, 2.0f, 1.0f).track;
@@ -214,7 +211,7 @@ void slider_track_minimum_uses_framebuffer_scale_only() {
             "Slider track minimum at scale 2.0 is not one logical unit");
 }
 
-void slider_anatomy_scales_with_logical_style_metrics() {
+IP_TEST_CASE(slider_anatomy_scales_with_logical_style_metrics, "slider-logical-scale") {
     const ip::detail::SliderAnatomy base = ip::detail::slider_anatomy(
         {{0.0f, 0.0f}, {100.0f, 20.0f}}, 0.0f, 1.0f, 0.5f, 10.0f, 1.0f);
     const ip::detail::SliderAnatomy scaled = ip::detail::slider_anatomy(
@@ -226,7 +223,7 @@ void slider_anatomy_scales_with_logical_style_metrics() {
             "Scaled Slider grab is not centered at x=100");
 }
 
-void slider_anatomy_maps_values_and_degenerate_ranges() {
+IP_TEST_CASE(slider_anatomy_maps_values_and_degenerate_ranges, "slider-value-mapping") {
     const ip_rect frame{{0.0f, 0.0f}, {100.0f, 20.0f}};
     const auto center = [frame](float min, float max, float value) {
         return center_x(ip::detail::slider_anatomy(
@@ -245,7 +242,7 @@ void slider_anatomy_maps_values_and_degenerate_ranges() {
             "Degenerate Slider range produced a non-finite center");
 }
 
-void slider_visual_states_map_to_material_slots() {
+IP_TEST_CASE(slider_visual_states_map_to_material_slots, "slider-slot-mapping") {
     using ip::detail::SliderVisualState;
     using ip::detail::StateColorSlot;
     require(ip::detail::slider_state_color_slot(SliderVisualState::Idle) ==
@@ -273,7 +270,7 @@ void require_chrome_matches(const ip_rect &chrome, ImVec2 expected_min,
             widget_name);
 }
 
-void multipart_chrome_excludes_visible_labels() {
+IP_TEST_CASE(multipart_chrome_excludes_visible_labels, "chrome-geometry") {
     initialize_context();
     ImGui::NewFrame();
     begin_fixed_window("multipart chrome geometry");
@@ -324,7 +321,7 @@ void multipart_chrome_excludes_visible_labels() {
     ImGui::DestroyContext();
 }
 
-void decoration_preserves_last_item_queries() {
+IP_TEST_CASE(decoration_preserves_last_item_queries, "last-item") {
     initialize_context();
     ImGuiIO &io = ImGui::GetIO();
     ImVec2 button_center{};
@@ -391,7 +388,7 @@ void decoration_preserves_last_item_queries() {
     ImGui::DestroyContext();
 }
 
-void exception_restores_style_colors_and_draw_channels() {
+IP_TEST_CASE(exception_restores_style_colors_and_draw_channels, "exception-safety") {
     initialize_context();
     ImGui::NewFrame();
     ip::Context painter;
@@ -423,7 +420,7 @@ void exception_restores_style_colors_and_draw_channels() {
     ImGui::DestroyContext();
 }
 
-void combo_restores_parent_colors_before_popup_contents() {
+IP_TEST_CASE(combo_restores_parent_colors_before_popup_contents, "combo-color-ordering") {
     initialize_context();
     ImGui::NewFrame();
     ip::Context painter;
@@ -464,43 +461,5 @@ void combo_restores_parent_colors_before_popup_contents() {
 } // namespace
 
 int main(int argc, char **argv) {
-    try {
-        require(argc == 2, "expected one test selector");
-        const std::string selector = argv[1];
-        if (selector == "suppression") {
-            decorators_suppress_expected_color_families();
-        } else if (selector == "chrome-geometry") {
-            multipart_chrome_excludes_visible_labels();
-        } else if (selector == "last-item") {
-            decoration_preserves_last_item_queries();
-        } else if (selector == "exception-safety") {
-            exception_restores_style_colors_and_draw_channels();
-        } else if (selector == "slider-grab-padding") {
-            slider_grab_padding_ignores_framebuffer_scale();
-        } else if (selector == "slider-track-minimum") {
-            slider_track_minimum_uses_framebuffer_scale_only();
-        } else if (selector == "slider-logical-scale") {
-            slider_anatomy_scales_with_logical_style_metrics();
-        } else if (selector == "slider-value-mapping") {
-            slider_anatomy_maps_values_and_degenerate_ranges();
-        } else if (selector == "slider-slot-mapping") {
-            slider_visual_states_map_to_material_slots();
-        } else if (selector == "combo-anatomy") {
-            combo_anatomy_partitions_without_gap_or_overlap();
-        } else if (selector == "tree-anatomy") {
-            tree_anatomy_handles_leaf_and_clamps_disclosure();
-        } else if (selector == "combo-slot-mapping") {
-            combo_visual_states_map_to_material_slots();
-        } else if (selector == "tree-slot-mapping") {
-            tree_visual_states_map_to_material_slots();
-        } else if (selector == "combo-color-ordering") {
-            combo_restores_parent_colors_before_popup_contents();
-        } else {
-            throw std::runtime_error("unknown test selector");
-        }
-        return 0;
-    } catch (const std::exception &error) {
-        std::cerr << error.what() << '\n';
-        return 1;
-    }
+    return ip_test::run(argc, argv);
 }

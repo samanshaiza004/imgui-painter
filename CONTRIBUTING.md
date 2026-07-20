@@ -26,12 +26,13 @@ cargo test --workspace
 cargo test --workspace --no-default-features
 cargo build --examples
 
-# C++ — the default build is core-only, needs no network, and must stay that way
+# C++ core + geometry tests — default-on, no network, and must stay that way
 cmake -B build && cmake --build build
+ctest --test-dir build --output-on-failure
 
-# C++ tests and examples are opt-in because they fetch Dear ImGui and GLFW
-cmake -B build-t -DIMGUI_PAINTER_BUILD_TESTS=ON && cmake --build build-t
-ctest --test-dir build-t --output-on-failure
+# Dear ImGui decorator tests and examples are explicit opt-ins
+cmake -B build-i -DIMGUI_PAINTER_BUILD_IMGUI_TESTS=ON && cmake --build build-i
+ctest --test-dir build-i --output-on-failure
 cmake -B build-ex -DIMGUI_PAINTER_BUILD_EXAMPLES=ON && cmake --build build-ex
 ```
 
