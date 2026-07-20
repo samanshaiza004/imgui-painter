@@ -37,9 +37,11 @@ cmake -B build-ex -DIMGUI_PAINTER_BUILD_EXAMPLES=ON && cmake --build build-ex
 ```
 
 `--no-default-features` is not a formality. It disables the `decorators` feature
-and is the executable proof that the painter core stays independent of any
-particular Dear ImGui version. If a change makes the core fail to compile without
-decorators, the layering has been broken — fix the layering, don't relax the test.
+and is the executable proof that the painter core and canvas-only recipes stay
+separate from code coupled to the pinned Dear ImGui version. The adapter still
+depends on `imgui-sys` because submitting a mesh requires `ImDrawList`. If a
+change makes the core fail to compile without decorators, the layering has been
+broken — fix the layering, don't relax the test.
 
 Automated tests cover mesh geometry, lifecycle cleanup, and composition
 invariants. They do **not** cover final rasterized appearance, which is why the

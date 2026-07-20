@@ -1,11 +1,11 @@
 //! Small chrome recipes derived from host-owned palette tokens.
 
+#[cfg(feature = "decorators")]
 use imgui_sys as sys;
 
-use crate::{
-    Border, Canvas, Color, ColorStop, ComboStyle, Gradient, GradientMode, Material, Rect, Shadow,
-    SliderStyle, StateColors, TreeStyle, Vec2,
-};
+use crate::{Border, Canvas, Color, ColorStop, Gradient, GradientMode, Rect, Shadow, Vec2};
+#[cfg(feature = "decorators")]
+use crate::{ComboStyle, Material, SliderStyle, StateColors, TreeStyle};
 
 /// A minimal chrome token palette. imgui-painter paints chrome only; `text` and `text_muted` exist so hosts keep typography coherent with the chrome, applied through stock ImGui style APIs (e.g. push_style_color(Text, ..)) — imgui-painter never paints text, and this crate links only imgui-sys so it deliberately owns no imgui-rs helper for it.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -21,10 +21,12 @@ pub struct Palette {
     pub text_muted: Color,
 }
 
+#[cfg(feature = "decorators")]
 fn channel(color: Color, shift: u32) -> u8 {
     ((color >> shift) & 0xff) as u8
 }
 
+#[cfg(feature = "decorators")]
 fn shade(color: Color, amount: f32) -> Color {
     let scale = 1.0 - amount;
     crate::rgba(
@@ -35,6 +37,7 @@ fn shade(color: Color, amount: f32) -> Color {
     )
 }
 
+#[cfg(feature = "decorators")]
 fn tint(color: Color, amount: f32) -> Color {
     let lift = |value: u8| (value as f32 + (u8::MAX - value) as f32 * amount).round() as u8;
     crate::rgba(
@@ -45,6 +48,7 @@ fn tint(color: Color, amount: f32) -> Color {
     )
 }
 
+#[cfg(feature = "decorators")]
 fn mix(a: Color, b: Color, amount: f32) -> Color {
     let amount = amount.clamp(0.0, 1.0);
     let blend = |shift| {
@@ -59,6 +63,7 @@ fn with_alpha(color: Color, alpha: u8) -> Color {
     (color & 0x00ff_ffff) | ((alpha as Color) << 24)
 }
 
+#[cfg(feature = "decorators")]
 fn color_f32(color: Color) -> [f32; 4] {
     const SCALE: f32 = 1.0 / 255.0;
     [
@@ -76,6 +81,7 @@ fn color_f32(color: Color) -> [f32; 4] {
 /// plots, and drag/drop feedback. The statically-sized array keeps this API
 /// independent of `imgui-rs` while making a version/count mismatch a compile
 /// error for the pinned `imgui-sys` ABI.
+#[cfg(feature = "decorators")]
 pub fn apply_imgui_colors(
     colors: &mut [[f32; 4]; sys::ImGuiCol_COUNT as usize],
     palette: &Palette,
@@ -229,6 +235,7 @@ fn point(x: f32, y: f32) -> Vec2 {
     Vec2 { x, y }
 }
 
+#[cfg(feature = "decorators")]
 fn border(color: Color) -> Border {
     Border {
         thickness: 1.0,
@@ -236,6 +243,7 @@ fn border(color: Color) -> Border {
     }
 }
 
+#[cfg(feature = "decorators")]
 fn colors(base: Color, hover: Color, active: Color) -> StateColors {
     StateColors {
         base,
@@ -245,6 +253,7 @@ fn colors(base: Color, hover: Color, active: Color) -> StateColors {
 }
 
 /// Raised stock-button chrome for the painter_demo rack transport.
+#[cfg(feature = "decorators")]
 pub fn raised_button(palette: &Palette) -> Material {
     Material {
         radius: 3.0,
@@ -265,6 +274,7 @@ pub fn raised_button(palette: &Palette) -> Material {
 }
 
 /// Compact low-elevation button chrome for the painter_demo rack toolbar.
+#[cfg(feature = "decorators")]
 pub fn toolbar_button(palette: &Palette) -> Material {
     Material {
         radius: 2.0,
@@ -279,6 +289,7 @@ pub fn toolbar_button(palette: &Palette) -> Material {
 }
 
 /// Sunken single-line InputText chrome for the painter_demo rack.
+#[cfg(feature = "decorators")]
 pub fn inset_control(palette: &Palette) -> Material {
     Material {
         radius: 2.0,
@@ -299,6 +310,7 @@ pub fn inset_control(palette: &Palette) -> Material {
 }
 
 /// Selection-led Selectable row chrome for the painter_demo rack.
+#[cfg(feature = "decorators")]
 pub fn selected_row(palette: &Palette) -> Material {
     Material {
         radius: 1.0,
@@ -313,6 +325,7 @@ pub fn selected_row(palette: &Palette) -> Material {
 }
 
 /// Hierarchical browser-row chrome for the painter_demo rack.
+#[cfg(feature = "decorators")]
 pub fn browser_tree_row(palette: &Palette) -> TreeStyle {
     TreeStyle {
         row: selected_row(palette),
@@ -330,6 +343,7 @@ pub fn browser_tree_row(palette: &Palette) -> TreeStyle {
 }
 
 /// Inset track, accent fill, and raised grab for the painter_demo rack.
+#[cfg(feature = "decorators")]
 pub fn parameter_slider(palette: &Palette) -> SliderStyle {
     SliderStyle {
         track: inset_control(palette),
@@ -348,6 +362,7 @@ pub fn parameter_slider(palette: &Palette) -> SliderStyle {
 }
 
 /// Inset field and raised arrow region for the painter_demo rack.
+#[cfg(feature = "decorators")]
 pub fn combo_field(palette: &Palette) -> ComboStyle {
     ComboStyle {
         frame: inset_control(palette),
@@ -415,7 +430,7 @@ pub fn inset_panel(canvas: &mut Canvas<'_>, rect: Rect, palette: &Palette) {
     );
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "decorators"))]
 mod tests {
     use super::*;
 

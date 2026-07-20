@@ -39,8 +39,43 @@ jobs:
       - name: test
         run: cargo test --workspace
 
+      - name: test without decorators
+        run: cargo test --workspace --no-default-features
+
       - name: build examples
         run: cargo build --workspace --examples
+
+  cpp:
+    name: C++ (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev xorg-dev
+
+      - name: Default core build and tests (offline)
+        run: |
+          cmake -B build
+          cmake --build build --config Release
+          ctest --test-dir build --output-on-failure -C Release
+
+      - name: Dear ImGui decorator tests
+        run: |
+          cmake -B build-imgui -DIMGUI_PAINTER_BUILD_IMGUI_TESTS=ON
+          cmake --build build-imgui --config Release
+          ctest --test-dir build-imgui --output-on-failure -C Release
+
+      - name: Build examples
+        run: |
+          cmake -B build-examples -DIMGUI_PAINTER_BUILD_EXAMPLES=ON
+          cmake --build build-examples --config Release
 
   # Reconstructed widget-chrome geometry (Checkbox box, InputText frame) is
   # not a stable Dear ImGui contract, so a fork revision change can compile

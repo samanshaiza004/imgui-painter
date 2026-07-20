@@ -9,6 +9,10 @@ publish = false
 # independently when the imgui-painter tree is copied outside a host workspace.
 description = "Rendering/styling toolkit for Dear ImGui, built on ImDrawList (Rust bindings)"
 
+[features]
+default = ["decorators"]
+decorators = []
+
 [dependencies]
 # Keep this aligned with a host's imgui-rs 0.12 dependency so Cargo resolves
 # one shared imgui-sys build (one cimgui compile, one ImGui instance).
@@ -41,3 +45,11 @@ cc = "1"
 [[bench]]
 name = "tessellation"
 harness = false
+
+[[example]]
+name = "basic"
+required-features = ["decorators"]
+
+[[example]]
+name = "painter_demo"
+required-features = ["decorators"]

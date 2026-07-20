@@ -8,9 +8,11 @@
 //! [`Session`] is the safe wrapper over the raw `ip_ctx*` FFI calls.
 
 pub mod adapter;
+#[cfg(feature = "decorators")]
 mod item_paint;
 pub mod recipes;
 
+#[cfg(feature = "decorators")]
 pub use item_paint::{
     decorate_button, decorate_checkbox, decorate_combo, decorate_input_text, decorate_selectable,
     decorate_slider_f32, decorate_tree_node, ComboStyle, Material, SliderStyle, StateColors,
