@@ -1,5 +1,92 @@
 # Contributing to imgui-painter
 
+## Filing and fixing issues
+
+### Opening an issue
+
+Bug reports, questions, and "this doc is wrong" reports can be a paragraph. Anything that will
+become a code change — a new decorator, a fixed formula, a CMake option, a test — should use this
+structure:
+
+```markdown
+## Why
+
+## Scope
+
+## Acceptance criteria
+
+## Non-goals
+
+## Verification
+
+## Relevant files
+```
+
+- **Why** — the problem or gap, not the solution. If it's a defect, say what's actually wrong and
+  where you saw it (a failing test, a stale doc claim, a CI log). If it's a feature, say what it
+  unblocks.
+- **Scope** — the files and areas the change touches, narrow enough that "done" is unambiguous.
+  An `area:` label should exist for it; if the change doesn't map onto exactly one, say so and
+  consider splitting the issue.
+- **Acceptance criteria** — concrete, checkable conditions, not a restatement of Scope. "Adds a
+  test" is Scope; "the test fails when the formula is wrong, verified by breaking it and
+  reverting" is an acceptance criterion.
+- **Non-goals** — what a reader might reasonably assume is included but isn't. This is what keeps
+  a scoped change from growing sideways mid-review.
+- **Verification** — the exact commands a reviewer runs to confirm it. For anything touching
+  geometry, alpha, or DPI scaling, "it compiles and the tests pass" is not sufficient on its own —
+  this project has already shipped tests that would have passed against a broken core, caught only
+  because someone deliberately broke the implementation and confirmed the test failed. If the
+  change is testable, say what failure the test would have caught and how to simulate it.
+- **Relevant files** — specific paths, not directories. `include/imgui_painter_decorators.h`, not
+  "the decorators."
+
+Example, using a real gap in this repo:
+
+```markdown
+## Why
+docs/screenshots/ still has painter-imgui-1.89.2.png and two punks-imgui-1.89.2-*.png files.
+The project has targeted 1.91.9b since the redesign; these are stale evidence, not documentation.
+
+## Scope
+Regenerate the three screenshots against current painter_demo output. docs/screenshots/ only.
+
+## Acceptance criteria
+- Three new PNGs replace the 1.89.2 ones, same names or renamed to match the current version.
+- Any book page or README that links to them still resolves.
+
+## Non-goals
+Not adding new screenshots for widgets that didn't exist in 1.89.2 (Slider/Combo/TreeNode) --
+that is a separate issue.
+
+## Verification
+Open each new PNG and confirm it matches what `cargo run --example painter_demo` renders today.
+
+## Relevant files
+docs/screenshots/painter-imgui-1.89.2.png
+docs/screenshots/punks-imgui-1.89.2-browse.png
+docs/screenshots/punks-imgui-1.89.2-settings.png
+```
+
+Label it. `type:` says what kind of change it is; `area:` says where; `platform:` only if it is
+specific to one OS. Add `needs visual gate` if it touches widget chrome — that is what tells a
+reviewer the automated quality bar alone will not be enough. Add `breaking change` if it changes a
+public API; this project is pre-1.0, so that is a changelog note, not necessarily a blocker.
+`expert wanted` is for anything touching the gotchas in this file or `docs/widget-anatomy.md` — DPI
+scaling, alpha compensation, chrome geometry — where a plausible-looking fix is often wrong.
+
+### Fixing an issue
+
+Comment before starting on anything non-trivial, so two people do not independently do the work.
+
+Reference the issue from the PR (`Closes #N`) rather than restating it — the issue is the spec,
+the PR is the diff against it. If the fix changes the acceptance criteria as filed, edit the issue
+rather than letting the PR silently redefine "done."
+
+Run the quality bar below; run the visual gate too if the issue carries `needs visual gate` or
+touches `include/imgui_painter_decorators.h` / `bindings/rust/src/item_paint.rs`, whether or not it
+was labeled — a missing label is a filing mistake, not an exemption.
+
 ## Building
 
 The Rust crate's `build.rs` compiles the C++ core with the [`cc`](https://docs.rs/cc)
